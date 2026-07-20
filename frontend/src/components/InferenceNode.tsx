@@ -1,6 +1,8 @@
 import { GitBranch, Scale, Sparkles } from 'lucide-react'
-import { Handle, Position } from '@xyflow/react'
+import type { Node, NodeProps } from '@xyflow/react'
+import type { GraphPort } from '../graph/claimGraphLayout'
 import type { InferenceStep } from '../types'
+import { GraphHandles } from './GraphHandles'
 
 const inferenceIcon = {
   DECISION: Scale,
@@ -9,13 +11,14 @@ const inferenceIcon = {
   GENERALIZATION: Sparkles,
 }
 
-export function InferenceNode({
-  data,
-  selected,
-}: {
-  data: { step: InferenceStep; faded?: boolean; spotlight?: boolean }
-  selected: boolean
-}) {
+export type InferenceNodeType = Node<{
+  step: InferenceStep
+  ports: GraphPort[]
+  faded?: boolean
+  spotlight?: boolean
+}, 'inference'>
+
+export function InferenceNode({ data, selected }: NodeProps<InferenceNodeType>) {
   const step = data.step
   const Icon = inferenceIcon[step.inferenceType]
 
@@ -28,8 +31,7 @@ export function InferenceNode({
         data.spotlight ? 'spotlight-node' : '',
       ].join(' ')}
     >
-      <Handle id="in" type="target" position={Position.Left} />
-      <Handle id="out" type="source" position={Position.Right} />
+      <GraphHandles ports={data.ports} />
       <div className="inference-icon">
         <Icon size={18} />
       </div>

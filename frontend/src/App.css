@@ -310,6 +310,16 @@ button {
   background: var(--canvas);
 }
 
+.graph-loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--dim);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
 .react-flow__edges {
   z-index: 0;
 }
@@ -334,7 +344,7 @@ button {
 .claim-node {
   position: relative;
   width: 238px;
-  min-height: 132px;
+  height: 132px;
   padding: 12px;
   color: var(--text);
   border: 1px solid var(--border-strong);
@@ -346,7 +356,7 @@ button {
 
 .target-node {
   width: 270px;
-  min-height: 150px;
+  height: 150px;
 }
 
 .node-topline,
@@ -461,7 +471,7 @@ button {
   align-items: center;
   gap: 10px;
   width: 190px;
-  min-height: 70px;
+  height: 70px;
   padding: 10px 12px;
   color: var(--text);
   border: 1px solid #9ccbe8;
@@ -482,11 +492,11 @@ button {
 }
 
 .react-flow__handle-left {
-  left: -6px;
+  left: 0;
 }
 
 .react-flow__handle-right {
-  right: -6px;
+  right: 0;
 }
 
 .inference-icon {
@@ -542,8 +552,11 @@ button {
 }
 
 .react-flow__edge-path {
-  stroke-width: 3;
-  opacity: 0.78;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.82;
+  transition: stroke-width 160ms ease, opacity 160ms ease;
 }
 
 .edge-supported .react-flow__edge-path {
@@ -563,7 +576,7 @@ button {
 }
 
 .edge-active .react-flow__edge-path {
-  stroke-width: 5;
+  stroke-width: 3.8;
   opacity: 1;
 }
 

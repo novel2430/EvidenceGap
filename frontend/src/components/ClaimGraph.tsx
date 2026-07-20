@@ -1,18 +1,26 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ReactFlow,
-  type Edge,
   type Node,
   type NodeMouseHandler,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import {
+  layoutClaimGraph,
+  type ClaimGraphLayout,
+} from '../graph/claimGraphLayout'
 import type { DemoCase, InspectorSelection, ViewMode } from '../types'
 import { ClaimNode } from './ClaimNode'
 import { InferenceNode } from './InferenceNode'
+import { RoutedEdge, type RoutedEdgeType } from './RoutedEdge'
 
 const nodeTypes = {
   claim: ClaimNode,
   inference: InferenceNode,
+}
+
+const edgeTypes = {
+  routed: RoutedEdge,
 }
 
 function edgeTone(status: string) {
@@ -29,7 +37,12 @@ function edgeColor(status: string) {
   return '#5d96b8'
 }
 
-function linkedIds(currentCase: DemoCase, selection: InspectorSelection | null, mode: ViewMode, targetActive: boolean) {
+function linkedIds(
+  currentCase: DemoCase,
+  selection: InspectorSelection | null,
+  mode: ViewMode,
+  targetActive: boolean,
+) {
   const ids = new Set<string>()
 
   if (targetActive) {
@@ -41,12 +54,17 @@ function linkedIds(currentCase: DemoCase, selection: InspectorSelection | null, 
       ids.add(gap.target)
       gap.blocks.forEach((id) => ids.add(id))
     })
-    currentCase.claims.filter((claim) => claim.gapIds.length > 0 || claim.status === 'BLOCKED').forEach((claim) => ids.add(claim.id))
+    currentCase.claims
+      .filter((claim) => claim.gapIds.length > 0 || claim.status === 'BLOCKED')
+      .forEach((claim) => ids.add(claim.id))
   }
 
   if (mode === 'conflicts') {
     currentCase.claims
-      .filter((claim) => claim.status === 'CONFLICTED' || claim.reasonCodes.includes('CONFLICTING_EVIDENCE'))
+      .filter(
+        (claim) => claim.status === 'CONFLICTED'
+          || claim.reasonCodes.includes('CONFLICTING_EVIDENCE'),
+      )
       .forEach((claim) => {
         ids.add(claim.id)
         claim.downstream.forEach((id) => ids.add(id))
@@ -78,6 +96,22 @@ function linkedIds(currentCase: DemoCase, selection: InspectorSelection | null, 
   return ids
 }
 
+function edgeStatusById(currentCase: DemoCase) {
+  const statusById = new Map<string, string>()
+
+  currentCase.inferenceSteps.forEach((step) => {
+    const conclusion = currentCase.claims.find((claim) => claim.id === step.conclusion)
+    const status = conclusion?.status ?? 'PARTIAL'
+
+    step.premises.forEach((premise) => {
+      statusById.set(`${premise}-${step.id}`, status)
+    })
+    statusById.set(`${step.id}-${step.conclusion}`, status)
+  })
+
+  return statusById
+}
+
 export function ClaimGraph({
   currentCase,
   selection,
@@ -91,6 +125,21 @@ export function ClaimGraph({
   targetActive: boolean
   onSelect: (selection: InspectorSelection) => void
 }) {
+  const [layout, setLayout] = useState<ClaimGraphLayout | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLayout(null)
+
+    void layoutClaimGraph(currentCase).then((nextLayout) => {
+      if (!cancelled) setLayout(nextLayout)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentCase])
+
   const focusIds = useMemo(
     () => linkedIds(currentCase, selection, viewMode, targetActive),
     [currentCase, selection, viewMode, targetActive],
@@ -98,69 +147,76 @@ export function ClaimGraph({
   const hasFocus = focusIds.size > 0
 
   const nodes = useMemo<Node[]>(() => {
-    const claimNodes: Node[] = currentCase.claims.map((claim) => ({
-      id: claim.id,
-      type: 'claim',
-      position: claim.position,
-      data: {
-        claim,
-        faded: hasFocus && !focusIds.has(claim.id),
-        spotlight: focusIds.has(claim.id),
-      },
-    }))
+    if (!layout) return []
 
-    const inferenceNodes: Node[] = currentCase.inferenceSteps.map((step) => ({
-      id: step.id,
-      type: 'inference',
-      position: step.position,
-      data: {
-        step,
-        faded: hasFocus && !focusIds.has(step.id),
-        spotlight: focusIds.has(step.id),
-      },
-    }))
+    const claimById = new Map(currentCase.claims.map((claim) => [claim.id, claim]))
+    const inferenceById = new Map(currentCase.inferenceSteps.map((step) => [step.id, step]))
 
-    return [...claimNodes, ...inferenceNodes]
-  }, [currentCase, focusIds, hasFocus])
+    const result: Node[] = []
 
-  const edges = useMemo<Edge[]>(() => {
-    const result: Edge[] = []
-    currentCase.inferenceSteps.forEach((step) => {
-      const conclusion = currentCase.claims.find((claim) => claim.id === step.conclusion)
-      const edgeClass = edgeTone(conclusion?.status ?? 'PARTIAL')
-      const color = edgeColor(conclusion?.status ?? 'PARTIAL')
-      step.premises.forEach((premise) => {
-        const id = `${premise}-${step.id}`
-        const active = focusIds.has(premise) && focusIds.has(step.id)
+    layout.nodes.forEach((layoutNode) => {
+      const claim = claimById.get(layoutNode.id)
+      if (claim) {
         result.push({
-          id,
-          source: premise,
-          sourceHandle: 'out',
-          target: step.id,
-          targetHandle: 'in',
-          type: 'straight',
-          style: { stroke: color },
-          className: [edgeClass, active ? 'edge-active' : '', hasFocus && !active ? 'edge-faded' : ''].join(' '),
-          animated: active && (targetActive || viewMode !== 'all'),
+          id: claim.id,
+          type: 'claim',
+          position: layoutNode.position,
+          data: {
+            claim,
+            ports: layoutNode.ports,
+            faded: hasFocus && !focusIds.has(claim.id),
+            spotlight: focusIds.has(claim.id),
+          },
         })
-      })
+        return
+      }
 
-      const id = `${step.id}-${step.conclusion}`
-      const active = focusIds.has(step.id) && focusIds.has(step.conclusion)
+      const step = inferenceById.get(layoutNode.id)
+      if (!step) return
+
       result.push({
-        id,
-        source: step.id,
-        sourceHandle: 'out',
-        target: step.conclusion,
-        targetHandle: 'in',
-        type: 'straight',
-        style: { stroke: color },
-        className: [edgeClass, active ? 'edge-active' : '', hasFocus && !active ? 'edge-faded' : ''].join(' '),
-        animated: active && (targetActive || viewMode !== 'all'),
+        id: step.id,
+        type: 'inference',
+        position: layoutNode.position,
+        data: {
+          step,
+          ports: layoutNode.ports,
+          faded: hasFocus && !focusIds.has(step.id),
+          spotlight: focusIds.has(step.id),
+        },
       })
     })
+
     return result
-  }, [currentCase, focusIds, hasFocus, targetActive, viewMode])
+  }, [currentCase, focusIds, hasFocus, layout])
+
+  const edges = useMemo<RoutedEdgeType[]>(() => {
+    if (!layout) return []
+
+    const statusById = edgeStatusById(currentCase)
+
+    return layout.edges.map((layoutEdge) => {
+      const status = statusById.get(layoutEdge.id) ?? 'PARTIAL'
+      const active = focusIds.has(layoutEdge.source) && focusIds.has(layoutEdge.target)
+
+      return {
+        id: layoutEdge.id,
+        source: layoutEdge.source,
+        sourceHandle: layoutEdge.sourceHandle,
+        target: layoutEdge.target,
+        targetHandle: layoutEdge.targetHandle,
+        type: 'routed',
+        data: { path: layoutEdge.path },
+        style: { stroke: edgeColor(status) },
+        className: [
+          edgeTone(status),
+          active ? 'edge-active' : '',
+          hasFocus && !active ? 'edge-faded' : '',
+        ].join(' '),
+        animated: active && (targetActive || viewMode !== 'all'),
+      }
+    })
+  }, [currentCase, focusIds, hasFocus, layout, targetActive, viewMode])
 
   const handleNodeClick: NodeMouseHandler = (_event, node) => {
     onSelect({ kind: node.type === 'inference' ? 'inference' : 'claim', id: node.id })
@@ -168,19 +224,28 @@ export function ClaimGraph({
 
   return (
     <section className="graph-panel panel">
-      <ReactFlow
-        key={currentCase.id}
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onNodeClick={handleNodeClick}
-        fitView
-        fitViewOptions={{ padding: 0.16 }}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable
-        proOptions={{ hideAttribution: true }}
-      />
+      {layout ? (
+        <ReactFlow
+          key={`${currentCase.id}-${layout.usedFallback ? 'fallback' : 'elk'}`}
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          onNodeClick={handleNodeClick}
+          fitView
+          fitViewOptions={{ padding: 0.12 }}
+          minZoom={0.24}
+          maxZoom={1.5}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable
+          proOptions={{ hideAttribution: true }}
+        />
+      ) : (
+        <div className="graph-loading" role="status">
+          LAYOUTING GRAPH…
+        </div>
+      )}
     </section>
   )
 }

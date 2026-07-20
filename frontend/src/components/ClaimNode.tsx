@@ -8,8 +8,10 @@ import {
   Sparkles,
   Target,
 } from 'lucide-react'
-import { Handle, Position } from '@xyflow/react'
+import type { Node, NodeProps } from '@xyflow/react'
+import type { GraphPort } from '../graph/claimGraphLayout'
 import type { Claim } from '../types'
+import { GraphHandles } from './GraphHandles'
 
 const statusIcon = {
   SUPPORTED: ShieldCheck,
@@ -29,7 +31,14 @@ const typeIcon = {
   RECOMMENDATION: Target,
 }
 
-export function ClaimNode({ data, selected }: { data: { claim: Claim; faded?: boolean; spotlight?: boolean }; selected: boolean }) {
+export type ClaimNodeType = Node<{
+  claim: Claim
+  ports: GraphPort[]
+  faded?: boolean
+  spotlight?: boolean
+}, 'claim'>
+
+export function ClaimNode({ data, selected }: NodeProps<ClaimNodeType>) {
   const claim = data.claim
   const StatusIcon = statusIcon[claim.status]
   const TypeIcon = typeIcon[claim.type]
@@ -46,8 +55,7 @@ export function ClaimNode({ data, selected }: { data: { claim: Claim; faded?: bo
         data.spotlight ? 'spotlight-node' : '',
       ].join(' ')}
     >
-      <Handle id="in" type="target" position={Position.Left} />
-      <Handle id="out" type="source" position={Position.Right} />
+      <GraphHandles ports={data.ports} />
       <div className="node-topline">
         <span className="type-badge">
           <TypeIcon size={13} />
