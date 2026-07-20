@@ -1,0 +1,59 @@
+{
+  "schema_version": "0.1-draft",
+  "description": "EvidenceGap V0/V1 共用字段草案；V2 时需重新审查。",
+  "required_top_level": [
+    "case_id",
+    "title",
+    "synthetic",
+    "case_type",
+    "original_conclusion",
+    "decision_context",
+    "claims",
+    "inference_steps",
+    "evidence_items",
+    "evidence_bindings",
+    "gaps",
+    "safe_conclusion"
+  ],
+  "claim_types": [
+    "OBSERVED_FACT",
+    "COMPUTED_METRIC",
+    "DOMAIN_RULE",
+    "ASSUMPTION",
+    "INFERRED_CLAIM",
+    "RECOMMENDATION"
+  ],
+  "verification_statuses": [
+    "SUPPORTED",
+    "PARTIAL",
+    "UNKNOWN",
+    "CONTRADICTED",
+    "CONFLICTED",
+    "BLOCKED"
+  ],
+  "binding_roles": [
+    "SUPPORTING",
+    "REFUTING",
+    "CONTEXT",
+    "RULE_SUPPORT",
+    "SCOPE_LIMITATION"
+  ],
+  "gap_types": [
+    "RETRIEVAL_GAP",
+    "EVIDENCE_GAP",
+    "SCOPE_GAP",
+    "INFERENCE_GAP",
+    "ASSUMPTION_GAP",
+    "CAUSAL_GAP",
+    "DECISION_GAP",
+    "PRIVATE_DATA_GAP",
+    "CONFLICT_GAP"
+  ],
+  "notes": [
+    "Inference Step 必须是一等对象。",
+    "Evidence、Evidence Binding、Verification Result 不应合并。",
+    "前端布局字段不应进入正式 Domain Model。",
+    "Recommendation 缺少 Decision Context 时应产生 Gap。",
+    "所有 synthetic 材料必须显式标记。"
+  ]
+}

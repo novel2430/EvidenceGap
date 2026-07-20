@@ -1,0 +1,156 @@
+- case_id: V1-01-ATOMIC-BOUNDARY
+  synthetic: true
+  focus: Atomic Claim 拆分边界
+  input_text: 药物D在模拟试验中降低了症状评分且未增加严重不良事件，因此适合所有患者长期使用。
+  annotation_tasks:
+  - 拆分 Atomic Claims
+  - 判断每个 Claim 类型
+  - 指出范围扩大与建议跳跃
+  - 生成安全结论
+  hidden_reference:
+    expected_core_claims:
+    - 药物D降低症状评分
+    - 药物D未增加严重不良事件
+    - 药物D适合所有患者
+    - 药物D适合长期使用
+    primary_gaps:
+    - SCOPE_GAP
+    - DECISION_GAP
+- case_id: V1-02-JOINT-PREMISES
+  synthetic: true
+  focus: 多个前提共同支持一个结论
+  input_text: 模拟政策规定中选药必须优先使用；医院也已完成目录准入，因此药物E在该院的采购可执行性较高。
+  annotation_tasks:
+  - 识别事实与规则
+  - 建立联合前提 Inference Step
+  - 判断是否仍有隐含假设
+  hidden_reference:
+    expected_core_claims:
+    - 政策规定中选药优先使用
+    - 医院已完成目录准入
+    - 药物E采购可执行性较高
+    primary_gaps:
+    - ASSUMPTION_GAP
+- case_id: V1-03-SCOPE
+  synthetic: true
+  focus: 人群和地区范围扩大
+  input_text: 在某省两家三甲医院的60岁以上患者中观察到药物F改善依从性，因此药物F能提高全国所有患者的依从性。
+  annotation_tasks:
+  - 标注 Claim Scope
+  - 判断部分支持与未知
+  - 定位 Scope Gap
+  hidden_reference:
+    expected_core_claims:
+    - 特定省份、医院和年龄人群中依从性改善
+    - 全国所有患者依从性改善
+    primary_gaps:
+    - SCOPE_GAP
+- case_id: V1-04-CAUSALITY
+  synthetic: true
+  focus: 相关性与因果性
+  input_text: 使用药物G的患者复诊率更高，说明药物G导致患者更愿意持续治疗。
+  annotation_tasks:
+  - 区分观察事实与因果 Claim
+  - 识别混杂假设
+  - 生成降级表达
+  hidden_reference:
+    expected_core_claims:
+    - 药物G使用者复诊率更高
+    - 药物G导致持续治疗意愿提高
+    primary_gaps:
+    - CAUSAL_GAP
+    - ASSUMPTION_GAP
+- case_id: V1-05-FACT-TO-ACTION
+  synthetic: true
+  focus: 事实直接跳到 Recommendation
+  input_text: 药物H进入模拟集采目录，因此企业应停止所有院内学术推广。
+  annotation_tasks:
+  - 拆分政策事实与行动建议
+  - 补充 Decision Context
+  - 指出缺失的中间 Claim
+  hidden_reference:
+    expected_core_claims:
+    - 药物H进入集采目录
+    - 企业应停止所有院内学术推广
+    primary_gaps:
+    - INFERENCE_GAP
+    - DECISION_GAP
+    - PRIVATE_DATA_GAP
+- case_id: V1-06-ASSUMPTION
+  synthetic: true
+  focus: Assumption 与 Unknown Fact 的区别
+  input_text: 零售药店覆盖增加后，药物I销量一定会上升，因为新增门店都会积极推荐该药。
+  annotation_tasks:
+  - 识别观察事实、推论和假设
+  - 判断哪些内容可公开验证
+  - 标注阻断点
+  hidden_reference:
+    expected_core_claims:
+    - 零售药店覆盖增加
+    - 药物I销量将上升
+    - 新增门店都会积极推荐药物I
+    primary_gaps:
+    - ASSUMPTION_GAP
+    - EVIDENCE_GAP
+- case_id: V1-07-CONFLICT
+  synthetic: true
+  focus: 支持与反驳证据并存
+  input_text: 一项模拟研究显示药物J降低住院率，另一项同规模模拟研究未发现差异，因此可以确定药物J有效。
+  annotation_tasks:
+  - 标注冲突 Evidence
+  - 区分 CONFLICTED 与 SUPPORTED
+  - 判断可表达的最大强度
+  hidden_reference:
+    expected_core_claims:
+    - 研究一显示住院率降低
+    - 研究二未发现差异
+    - 可以确定药物J有效
+    primary_gaps:
+    - CONFLICT_GAP
+- case_id: V1-08-ALTERNATIVE-PATHS
+  synthetic: true
+  focus: 替代推理路径
+  input_text: 药物K可能值得扩大零售投入：一条理由是试点城市零售增长明显；另一条理由是同类药在线渠道增长明显，但药物K自身没有在线数据。
+  annotation_tasks:
+  - 建立两条替代路径
+  - 判断哪条路径闭合
+  - 区分直接证据与类比推理
+  hidden_reference:
+    expected_core_claims:
+    - 药物K试点城市零售增长
+    - 同类药在线渠道增长
+    - 药物K值得扩大零售投入
+    primary_gaps:
+    - SCOPE_GAP
+    - INFERENCE_GAP
+- case_id: V1-09-PRIVATE-DATA
+  synthetic: true
+  focus: 公开证据不足与私有数据缺失
+  input_text: 公开政策显示药物L采购价格下降，因此企业的该品种利润一定下降，应该立刻减少生产。
+  annotation_tasks:
+  - 区分公开政策事实与企业经营结果
+  - 识别私有数据需求
+  - 补充 Decision Context
+  hidden_reference:
+    expected_core_claims:
+    - 药物L采购价格下降
+    - 企业利润下降
+    - 企业应减少生产
+    primary_gaps:
+    - PRIVATE_DATA_GAP
+    - DECISION_GAP
+- case_id: V1-10-EXPIRED-RULE
+  synthetic: true
+  focus: 时间适用范围与失效规则
+  input_text: 依据2023年的模拟政策，药物M必须优先采购，因此2026年医院仍必须优先采购药物M。
+  annotation_tasks:
+  - 标注政策时间范围
+  - 判断规则是否仍适用
+  - 区分 Contradicted、Unknown 与 Scope Gap
+  hidden_reference:
+    expected_core_claims:
+    - 2023年政策要求优先采购
+    - 2026年仍必须优先采购
+    primary_gaps:
+    - SCOPE_GAP
+    - EVIDENCE_GAP

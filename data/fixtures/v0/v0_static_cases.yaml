@@ -1,0 +1,419 @@
+- case_id: V0-A-CLOSED-001
+  title: 限定人群中的治疗优先级建议
+  synthetic: true
+  case_type: clinical_decision
+  purpose: 展示证据链基本闭合的案例。
+  original_conclusion: 对于65岁以上且近期有住院史的X病患者，在没有特定禁忌证时，可优先考虑药物A联合标准治疗。
+  decision_context:
+    goal: 降低90天内再次住院率，同时不显著增加严重不良事件
+    metric:
+    - 90天再次住院率
+    - 严重不良事件率
+    alternatives:
+    - 标准治疗
+    - 药物A联合标准治疗
+    constraints:
+    - 仅适用于65岁以上且近期有住院史的人群
+    - 排除存在特定禁忌证者
+    risk_tolerance: 不接受严重不良事件明显增加
+  claims:
+  - claim_id: A-C1
+    text: 在65岁以上且近期有住院史的X病患者中，药物A联合标准治疗降低了90天再次住院率。
+    type: OBSERVED_FACT
+    status: SUPPORTED
+    reason_codes: []
+    is_target: false
+  - claim_id: A-C2
+    text: 在该研究人群中，药物A联合标准治疗未显著增加严重不良事件。
+    type: OBSERVED_FACT
+    status: SUPPORTED
+    reason_codes: []
+    is_target: false
+  - claim_id: A-C3
+    text: 当目标是降低90天再次住院且不显著增加严重不良事件时，药物A联合标准治疗优于单独标准治疗。
+    type: INFERRED_CLAIM
+    status: SUPPORTED
+    reason_codes: []
+    is_target: false
+  - claim_id: A-C4
+    text: 对于符合研究范围且无特定禁忌证的患者，可优先考虑药物A联合标准治疗。
+    type: RECOMMENDATION
+    status: SUPPORTED
+    reason_codes: []
+    is_target: true
+  inference_steps:
+  - step_id: A-S1
+    premises:
+    - A-C1
+    - A-C2
+    conclusion: A-C3
+    inference_type: DECISION
+    rule_description: 在预设目标和风险约束下比较两个治疗选项。
+    required_assumptions: []
+    expert_judgment: false
+  - step_id: A-S2
+    premises:
+    - A-C3
+    conclusion: A-C4
+    inference_type: DOMAIN_RULE_APPLICATION
+    rule_description: 建议范围不得超过研究人群与禁忌证条件。
+    required_assumptions: []
+    expert_judgment: true
+  evidence_items:
+  - evidence_id: A-E1
+    source_id: SYN-RCT-A-2026
+    source_type: SYNTHETIC_TRIAL
+    text: 在模拟随机试验中，65岁以上且过去12个月有住院史的X病患者接受药物A联合标准治疗后，90天再次住院率为18%，标准治疗组为25%。
+    span: 全文
+    time_scope: 90天
+    geography: 模拟多中心
+    population: 65岁以上且近期有住院史的X病患者
+    synthetic: true
+  - evidence_id: A-E2
+    source_id: SYN-RCT-A-2026
+    source_type: SYNTHETIC_TRIAL
+    text: 模拟试验中，两组严重不良事件率分别为6.1%与6.4%，未显示明显增加。
+    span: 全文
+    time_scope: 90天
+    geography: 模拟多中心
+    population: 同一研究人群
+    synthetic: true
+  evidence_bindings:
+  - binding_id: A-B1
+    evidence_id: A-E1
+    claim_id: A-C1
+    role: SUPPORTING
+  - binding_id: A-B2
+    evidence_id: A-E2
+    claim_id: A-C2
+    role: SUPPORTING
+  gaps: []
+  safe_conclusion:
+    text: 对于65岁以上、近期有住院史且无特定禁忌证的X病患者，在降低90天再次住院且不显著增加严重不良事件的目标下，可优先考虑药物A联合标准治疗。
+    retained_claims:
+    - A-C1
+    - A-C2
+    - A-C3
+    - A-C4
+    removed_claims: []
+    weakened_claims: []
+    limitations:
+    - 仅适用于模拟研究所覆盖的人群和时间范围
+- case_id: V0-B-GAP-001
+  title: 集采后削减院内推广预算
+  synthetic: true
+  case_type: commercial_recommendation
+  purpose: 展示政策事实存在，但商业建议因内部数据缺失而被阻断。
+  original_conclusion: 药物B进入集采后，应立即削减30%的院内推广预算，并将资源转向零售渠道。
+  decision_context:
+    goal: 提升单位营销投入的销售产出
+    metric:
+    - 院内推广ROI
+    - 零售渠道增量销售
+    - 渠道转移成本
+    alternatives:
+    - 维持现有预算
+    - 小幅调整
+    - 削减30%并转向零售
+    constraints:
+    - 缺少企业内部成本和渠道执行数据
+    risk_tolerance: 未定义
+  claims:
+  - claim_id: B-C1
+    text: 药物B已进入当前集采执行范围。
+    type: OBSERVED_FACT
+    status: SUPPORTED
+    reason_codes: []
+    is_target: false
+  - claim_id: B-C2
+    text: 集采中选提高了药物B在院内采购中的确定性。
+    type: INFERRED_CLAIM
+    status: PARTIAL
+    reason_codes:
+    - INFERENCE_RULE_MISSING
+    is_target: false
+  - claim_id: B-C3
+    text: 药物B的院内推广边际收益已经下降。
+    type: INFERRED_CLAIM
+    status: UNKNOWN
+    reason_codes:
+    - PRIVATE_DATA_REQUIRED
+    is_target: false
+  - claim_id: B-C4
+    text: 药物B在零售渠道存在足以承接新增预算的增长空间。
+    type: INFERRED_CLAIM
+    status: PARTIAL
+    reason_codes:
+    - SCOPE_MISMATCH
+    is_target: false
+  - claim_id: B-C5
+    text: 企业应立即削减30%的院内推广预算并转向零售渠道。
+    type: RECOMMENDATION
+    status: BLOCKED
+    reason_codes:
+    - PRIVATE_DATA_REQUIRED
+    - DECISION_CONTEXT_MISSING
+    is_target: true
+  inference_steps:
+  - step_id: B-S1
+    premises:
+    - B-C1
+    conclusion: B-C2
+    inference_type: DOMAIN_RULE_APPLICATION
+    rule_description: 集采中选通常会改变院内采购准入和执行条件，但具体确定性仍受履约与医院执行影响。
+    required_assumptions:
+    - 医院按预期履约
+    expert_judgment: true
+  - step_id: B-S2
+    premises:
+    - B-C2
+    conclusion: B-C3
+    inference_type: CAUSAL
+    rule_description: 若推广主要用于争取采购，采购确定性提高可能降低边际推广价值。
+    required_assumptions:
+    - 院内推广的主要作用是争取采购
+    - 不存在新的临床教育需求
+    expert_judgment: true
+  - step_id: B-S3
+    premises:
+    - B-C3
+    - B-C4
+    conclusion: B-C5
+    inference_type: DECISION
+    rule_description: 比较院内与零售渠道的边际ROI、执行成本与风险后决定预算配置。
+    required_assumptions:
+    - 削减30%优于其他调整幅度
+    expert_judgment: true
+  evidence_items:
+  - evidence_id: B-E1
+    source_id: SYN-POLICY-B-2026
+    source_type: SYNTHETIC_POLICY
+    text: 模拟集采公告列示药物B为中选品种，自2026年第二季度起进入执行期。
+    span: 全文
+    time_scope: 2026年第二季度起
+    geography: 模拟地区
+    population: 适用医疗机构
+    synthetic: true
+  - evidence_id: B-E2
+    source_id: SYN-RETAIL-B-2026Q1
+    source_type: SYNTHETIC_SALES
+    text: 模拟数据显示，三个试点城市的药物B零售销售额同比增长12%。
+    span: 全文
+    time_scope: 2026年第一季度
+    geography: 三个试点城市
+    population: 零售购药人群
+    synthetic: true
+  evidence_bindings:
+  - binding_id: B-B1
+    evidence_id: B-E1
+    claim_id: B-C1
+    role: SUPPORTING
+  - binding_id: B-B2
+    evidence_id: B-E2
+    claim_id: B-C4
+    role: SUPPORTING
+  - binding_id: B-B3
+    evidence_id: B-E2
+    claim_id: B-C4
+    role: SCOPE_LIMITATION
+  gaps:
+  - gap_id: B-G1
+    gap_type: PRIVATE_DATA_GAP
+    target: B-C3
+    blocks:
+    - B-C5
+    reason: 缺少院内推广成本、触达、采购履约和增量销售数据。
+    required_evidence: 企业内部院内推广投入与产出数据
+    private_data_required: true
+  - gap_id: B-G2
+    gap_type: DECISION_GAP
+    target: B-S3
+    blocks:
+    - B-C5
+    reason: 没有比较30%削减幅度与其他行动方案的收益、成本和风险。
+    required_evidence: 多方案预算情景与ROI比较
+    private_data_required: true
+  - gap_id: B-G3
+    gap_type: SCOPE_GAP
+    target: B-C4
+    blocks:
+    - B-C5
+    reason: 三个试点城市的零售增长不能直接代表全国渠道承接能力。
+    required_evidence: 更广地区的渠道容量、覆盖和转化数据
+    private_data_required: false
+  safe_conclusion:
+    text: 现有模拟政策和局部零售数据表明，可进一步评估增加零售渠道投入的可能性；但由于缺少院内推广ROI、采购履约、渠道承接能力和不同预算方案比较，目前不足以支持立即削减30%的院内推广预算。
+    retained_claims:
+    - B-C1
+    removed_claims:
+    - B-C5
+    weakened_claims:
+    - claim_id: B-C4
+      operation: 缩小地区范围并降低确定性
+    limitations:
+    - 缺少企业内部数据
+    - 零售证据仅覆盖三个试点城市
+- case_id: V0-C-OVERREACH-001
+  title: 局部研究被扩大为全国替代建议
+  synthetic: true
+  case_type: research_conclusion_audit
+  purpose: 展示范围扩大、因果跳跃与冲突证据。
+  original_conclusion: 某城市医院研究已经证明药物C能降低全国所有患者死亡率，因此应全面替代现有治疗。
+  decision_context:
+    goal: 降低死亡率
+    metric:
+    - 90天死亡率
+    - 严重不良事件
+    - 治疗可及性
+    alternatives:
+    - 现有治疗
+    - 药物C
+    - 分层使用
+    constraints:
+    - 仅有单中心观察性研究和一项方向相反的模拟研究
+    risk_tolerance: 未定义
+  claims:
+  - claim_id: C-C1
+    text: 在某城市单家医院的高风险患者中，药物C使用者的90天死亡率较低。
+    type: OBSERVED_FACT
+    status: SUPPORTED
+    reason_codes: []
+    is_target: false
+  - claim_id: C-C2
+    text: 药物C导致了该人群死亡率下降。
+    type: INFERRED_CLAIM
+    status: PARTIAL
+    reason_codes:
+    - CAUSALITY_NOT_ESTABLISHED
+    - CONFLICTING_EVIDENCE
+    is_target: false
+  - claim_id: C-C3
+    text: 该效果适用于全国所有患者。
+    type: INFERRED_CLAIM
+    status: UNKNOWN
+    reason_codes:
+    - SCOPE_MISMATCH
+    is_target: false
+  - claim_id: C-C4
+    text: 药物C应全面替代现有治疗。
+    type: RECOMMENDATION
+    status: BLOCKED
+    reason_codes:
+    - SCOPE_MISMATCH
+    - CAUSALITY_NOT_ESTABLISHED
+    - DECISION_CONTEXT_MISSING
+    is_target: true
+  inference_steps:
+  - step_id: C-S1
+    premises:
+    - C-C1
+    conclusion: C-C2
+    inference_type: CAUSAL
+    rule_description: 由观察性关联推断治疗因果效果。
+    required_assumptions:
+    - 不存在未控制混杂
+    expert_judgment: true
+  - step_id: C-S2
+    premises:
+    - C-C2
+    conclusion: C-C3
+    inference_type: GENERALIZATION
+    rule_description: 从单中心高风险人群外推到全国所有患者。
+    required_assumptions:
+    - 患者结构、治疗条件和实施环境一致
+    expert_judgment: true
+  - step_id: C-S3
+    premises:
+    - C-C2
+    - C-C3
+    conclusion: C-C4
+    inference_type: DECISION
+    rule_description: 根据疗效、安全性、可及性与替代成本决定是否全面替代。
+    required_assumptions:
+    - 安全性和成本均可接受
+    - 不存在更合适的分层方案
+    expert_judgment: true
+  evidence_items:
+  - evidence_id: C-E1
+    source_id: SYN-OBS-C-2026
+    source_type: SYNTHETIC_OBSERVATIONAL_STUDY
+    text: 模拟单中心观察研究中，高风险患者使用药物C者的90天死亡率为9%，未使用者为13%。
+    span: 全文
+    time_scope: 90天
+    geography: 某城市单家医院
+    population: 高风险患者
+    synthetic: true
+  - evidence_id: C-E2
+    source_id: SYN-RCT-C-2026
+    source_type: SYNTHETIC_TRIAL
+    text: 另一项模拟多中心试验未观察到药物C在总体人群中的死亡率优势。
+    span: 全文
+    time_scope: 90天
+    geography: 模拟多中心
+    population: 总体患者
+    synthetic: true
+  evidence_bindings:
+  - binding_id: C-B1
+    evidence_id: C-E1
+    claim_id: C-C1
+    role: SUPPORTING
+  - binding_id: C-B2
+    evidence_id: C-E1
+    claim_id: C-C2
+    role: CONTEXT
+  - binding_id: C-B3
+    evidence_id: C-E2
+    claim_id: C-C2
+    role: REFUTING
+  - binding_id: C-B4
+    evidence_id: C-E1
+    claim_id: C-C3
+    role: SCOPE_LIMITATION
+  gaps:
+  - gap_id: C-G1
+    gap_type: CAUSAL_GAP
+    target: C-S1
+    blocks:
+    - C-C2
+    - C-C4
+    reason: 观察性差异不足以单独证明药物导致死亡率下降。
+    required_evidence: 更强因果设计或充分混杂控制
+    private_data_required: false
+  - gap_id: C-G2
+    gap_type: SCOPE_GAP
+    target: C-S2
+    blocks:
+    - C-C3
+    - C-C4
+    reason: 单中心高风险人群不能直接外推至全国所有患者。
+    required_evidence: 多地区、不同风险层患者的验证数据
+    private_data_required: false
+  - gap_id: C-G3
+    gap_type: CONFLICT_GAP
+    target: C-C2
+    blocks:
+    - C-C4
+    reason: 不同模拟研究对死亡率效果给出不一致结果。
+    required_evidence: 冲突来源分析、研究质量比较或进一步研究
+    private_data_required: false
+  - gap_id: C-G4
+    gap_type: DECISION_GAP
+    target: C-S3
+    blocks:
+    - C-C4
+    reason: 缺少安全性、成本、可及性与分层替代方案比较。
+    required_evidence: 完整决策比较
+    private_data_required: false
+  safe_conclusion:
+    text: 一项模拟单中心观察研究在高风险患者中观察到药物C使用与较低90天死亡率相关，但现有材料不足以建立因果关系，也不足以外推至全国所有患者或支持全面替代现有治疗。
+    retained_claims:
+    - C-C1
+    removed_claims:
+    - C-C3
+    - C-C4
+    weakened_claims:
+    - claim_id: C-C2
+      operation: 因果降为相关，并限定为单中心高风险人群
+    limitations:
+    - 存在方向不一致的研究
+    - 缺少决策比较

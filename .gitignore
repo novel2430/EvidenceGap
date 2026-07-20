@@ -1,0 +1,31 @@
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+
+# Test outputs
+frontend/playwright-report/
+frontend/test-results/
+frontend/blob-report/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+.temp/
