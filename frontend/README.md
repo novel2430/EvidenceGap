@@ -1,32 +1,23 @@
-# React + TypeScript + Vite
+# EvidenceGap Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+V0 的 React + TypeScript + Vite 前端，用於展示醫療結論的證據鏈、證據缺口與安全結論比較。
 
-Currently, two official plugins are available:
+## 開發
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+pnpm install
+pnpm dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+專案要求 Node.js 24，套件管理器為 pnpm 11。
+
+## 可調整工作區
+
+工作台使用 `react-resizable-panels` 建立巢狀可調整版面：
+
+- 拖曳左側案例列表、中央 Claim Graph、右側 Evidence Inspector 之間的直向分隔線，可調整各欄寬度。
+- 拖曳主工作區與底部報告之間的橫向分隔線，可調整上下高度。
+- 拖曳 Gap Report 與 Conclusion Compare 之間的分隔線，可調整底部兩區寬度。
+- 分隔線取得焦點後，可用方向鍵微調尺寸。
+
+各面板都設定了最低尺寸，避免把內容壓縮到不可讀。
