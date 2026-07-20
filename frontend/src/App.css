@@ -213,11 +213,18 @@ button {
 .workbench-body {
   position: relative;
   z-index: 1;
+  background: #ffffff;
   overflow: hidden;
 }
 
 .split-panel-content {
+  background: #ffffff;
   overflow: hidden;
+}
+
+.split-panel-content > .panel {
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .resize-handle {
@@ -226,7 +233,7 @@ button {
   flex: 0 0 auto;
   border: 0;
   border-radius: 999px;
-  background: transparent;
+  background: #ffffff;
   outline: none;
   touch-action: none;
 }
@@ -413,6 +420,8 @@ button {
 
 .claim-node {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 238px;
   height: 132px;
   padding: 12px;
@@ -430,6 +439,7 @@ button {
 }
 
 .node-topline,
+.node-footer,
 .node-metrics,
 .node-status,
 .type-badge {
@@ -438,7 +448,7 @@ button {
 }
 
 .node-topline,
-.node-metrics {
+.node-footer {
   justify-content: space-between;
 }
 
@@ -463,7 +473,10 @@ button {
 }
 
 .node-title {
-  margin: 16px 0 14px;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  margin: 8px 0;
   font-size: 17px;
   font-weight: 800;
   line-height: 1.22;
@@ -473,17 +486,25 @@ button {
   font-size: 20px;
 }
 
+.node-footer {
+  gap: 8px;
+  min-width: 0;
+}
+
 .node-metrics {
+  gap: 8px;
+  min-width: 0;
   color: var(--muted);
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .node-status {
+  flex: 0 0 auto;
   gap: 6px;
   width: max-content;
-  margin-top: 10px;
-  padding: 6px 8px;
-  font-size: 11px;
+  padding: 5px 7px;
+  font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.06em;
   background: rgba(255, 255, 255, 0.04);

@@ -64,13 +64,15 @@ export function ClaimNode({ data, selected }: NodeProps<ClaimNodeType>) {
         <span className="node-id">{claim.id}</span>
       </div>
       <div className="node-title">{claim.shortText}</div>
-      <div className="node-metrics">
-        <span>{claim.evidenceIds.length} Evidence</span>
-        <span>{claim.gapIds.length} Gap</span>
-      </div>
-      <div className="node-status">
-        <StatusIcon size={15} />
-        {claim.status}
+      <div className="node-footer">
+        <div className="node-metrics">
+          <span>{claim.evidenceIds.length} Evidence</span>
+          <span>{claim.gapIds.length} Gap</span>
+        </div>
+        <div className="node-status">
+          <StatusIcon size={14} />
+          {claim.status}
+        </div>
       </div>
     </div>
   )
