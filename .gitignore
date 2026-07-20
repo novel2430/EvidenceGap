@@ -31,3 +31,7 @@ tmp/
 .temp/
 
 *.zip
+
+/data/raw/
+/data/processed/
+/data/indexes/
