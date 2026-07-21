@@ -1,0 +1,111 @@
+{
+  "caveats": [
+    "Open-corpus metrics use incomplete judgments and treat only known positives as gold.",
+    "Unjudged articles are not counted as confirmed negatives.",
+    "Independent-source is the primary track; origin-source is a sanity check.",
+    "Judged Recall@10 and Recall@50 are retained only for backward compatibility; candidate pools contain at most five articles and these metrics saturate.",
+    "Pairwise ordering accuracy excludes queries whose judged candidates all have the same relevance grade."
+  ],
+  "created_at": "2026-07-21T09:37:45.303777+00:00",
+  "excluded_no_eligible_judgments": 0,
+  "failure_cases": {
+    "count": 10002,
+    "path": "reports/v1/article_retrieval_bm25_test_failures.jsonl",
+    "track": "independent"
+  },
+  "files": {
+    "independent_failure_cases": "reports/v1/article_retrieval_bm25_test_failures.jsonl",
+    "judged_independent": "artifacts/v1/article_retrieval_runs/test_judged_independent_bm25s_default.trec",
+    "judged_origin": "artifacts/v1/article_retrieval_runs/test_judged_origin_bm25s_default.trec",
+    "judged_overall": "artifacts/v1/article_retrieval_runs/test_judged_overall_bm25s_default.trec",
+    "open_independent": "artifacts/v1/article_retrieval_runs/test_open_independent_bm25s_default.trec",
+    "open_origin": "artifacts/v1/article_retrieval_runs/test_open_origin_bm25s_default.trec",
+    "open_overall": "artifacts/v1/article_retrieval_runs/test_open_overall_bm25s_default.trec"
+  },
+  "queries_evaluated": 26303,
+  "queries_in_split": 26303,
+  "queries_with_eligible_judgments": 26303,
+  "query_limit": null,
+  "run_name": "bm25s_default",
+  "run_source": "live_retrieval",
+  "schema_version": "1.1.0",
+  "split": "test",
+  "top_k": 100,
+  "tracks": {
+    "independent": {
+      "eligible_queries": 20386,
+      "excluded_no_candidates": 298,
+      "excluded_no_positive": 5619,
+      "judged_candidate_ranking": {
+        "mean_top1_relevance_grade": 1.25679388,
+        "mrr": 0.90444831,
+        "ndcg@10": 0.89469834,
+        "ndcg@3": 0.88272102,
+        "ndcg@5": 0.89469834,
+        "pairwise_ordering_accuracy": 0.69574096,
+        "recall@10": 1.0,
+        "recall@50": 1.0,
+        "top1_positive_rate": 0.81428431
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.66923379,
+        "hitrate@100": 0.87314824,
+        "known_positive_recall@10": 0.5554212,
+        "known_positive_recall@100": 0.80262435,
+        "known_positive_recall@50": 0.73963341
+      },
+      "pairwise_evaluable_queries": 18442,
+      "queries_with_eligible_judgments": 26303
+    },
+    "origin": {
+      "eligible_queries": 13677,
+      "excluded_no_candidates": 12603,
+      "excluded_no_positive": 23,
+      "judged_candidate_ranking": {
+        "mean_top1_relevance_grade": 1.96336916,
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "ndcg@3": 1.0,
+        "ndcg@5": 1.0,
+        "pairwise_ordering_accuracy": null,
+        "recall@10": 1.0,
+        "recall@50": 1.0,
+        "top1_positive_rate": 1.0
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.99590553,
+        "hitrate@100": 0.99941508,
+        "known_positive_recall@10": 0.99590553,
+        "known_positive_recall@100": 0.99941508,
+        "known_positive_recall@50": 0.99919573
+      },
+      "pairwise_evaluable_queries": 0,
+      "queries_with_eligible_judgments": 26303
+    },
+    "overall": {
+      "eligible_queries": 25298,
+      "excluded_no_candidates": 0,
+      "excluded_no_positive": 1005,
+      "judged_candidate_ranking": {
+        "mean_top1_relevance_grade": 1.69021267,
+        "mrr": 0.96002978,
+        "ndcg@10": 0.9413755,
+        "ndcg@3": 0.92597744,
+        "ndcg@5": 0.9413755,
+        "pairwise_ordering_accuracy": 0.80990018,
+        "recall@10": 1.0,
+        "recall@50": 1.0,
+        "top1_positive_rate": 0.92256305
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.85137165,
+        "hitrate@100": 0.9466361,
+        "known_positive_recall@10": 0.69978457,
+        "known_positive_recall@100": 0.8682498,
+        "known_positive_recall@50": 0.82637824
+      },
+      "pairwise_evaluable_queries": 23688,
+      "queries_with_eligible_judgments": 26303
+    }
+  }
+}
