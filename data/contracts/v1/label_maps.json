@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0.0",
+  "medfact_stance_5": {
+    "task_id": "STANCE-MEDFACT-5",
+    "ordered": true,
+    "labels": {
+      "-2": "STRONG_REFUTE",
+      "-1": "PARTIAL_REFUTE",
+      "0": "NEUTRAL_OR_INSUFFICIENT",
+      "1": "PARTIAL_SUPPORT",
+      "2": "STRONG_SUPPORT"
+    }
+  },
+  "medfact_relevance_3": {
+    "task_id": "AR-MEDFACT-JUDGED",
+    "ordered": true,
+    "labels": {
+      "0": "NO_POSITIVE_JUDGMENT",
+      "1": "PARTIALLY_RELEVANT",
+      "2": "STRONGLY_RELEVANT"
+    },
+    "derivation": "abs(medfact_stance_5)",
+    "note": "Grade 0 combines unrelated, unaddressed, and insufficient evidence under the source labeling prompt."
+  },
+  "healthfc_verdict_3": {
+    "task_id": "VERDICT-HEALTHFC-3",
+    "ordered": false,
+    "labels": {
+      "0": "SUPPORTED",
+      "1": "NOT_ENOUGH_INFORMATION",
+      "2": "REFUTED"
+    }
+  },
+  "medfact_to_healthfc_probability_fold": {
+    "SUPPORTED": [
+      1,
+      2
+    ],
+    "NOT_ENOUGH_INFORMATION": [
+      0
+    ],
+    "REFUTED": [
+      -2,
+      -1
+    ]
+  }
+}

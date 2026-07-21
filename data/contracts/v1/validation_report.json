@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0.0",
+  "mode": "full",
+  "ok": true,
+  "checks": [
+    {
+      "name": "Contract files",
+      "status": "PASS",
+      "details": [
+        "data/contracts/v1/dataset_mappings.json",
+        "data/contracts/v1/label_maps.json",
+        "data/contracts/v1/examples/medfact_claim_article.json",
+        "data/contracts/v1/examples/evidencebench_query.json",
+        "data/contracts/v1/examples/healthfc_verdict.json"
+      ]
+    },
+    {
+      "name": "MedFact mapping",
+      "status": "PASS",
+      "details": {
+        "files_scanned": 17,
+        "rows_scanned": 1497981,
+        "label_counts": {
+          "-2": 266667,
+          "-1": 111819,
+          "0": 545603,
+          "1": 228047,
+          "2": 345845
+        },
+        "mode": "full"
+      }
+    },
+    {
+      "name": "MedFact label domain",
+      "status": "PASS",
+      "details": [
+        -2,
+        -1,
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "name": "EvidenceBench mapping",
+      "status": "PASS",
+      "details": {
+        "rows_scanned": 107461,
+        "split_counts": {
+          "evidencebench_100k_train_set.json": 87461,
+          "evidencebench_100k_test_set.json": 20000
+        },
+        "mode": "full"
+      }
+    },
+    {
+      "name": "EvidenceBench index bounds",
+      "status": "PASS"
+    },
+    {
+      "name": "EvidenceBench reverse mapping",
+      "status": "PASS"
+    },
+    {
+      "name": "HealthFC mapping",
+      "status": "PASS",
+      "details": {
+        "rows": 750,
+        "encoding": "utf-8-sig",
+        "delimiter": ","
+      }
+    },
+    {
+      "name": "HealthFC label domain",
+      "status": "PASS",
+      "details": {
+        "0": 202,
+        "1": 423,
+        "2": 125
+      }
+    },
+    {
+      "name": "Contract examples",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}

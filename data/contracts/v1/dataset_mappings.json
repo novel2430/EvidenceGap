@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0.0",
+  "description": "EvidenceGap V1 raw-to-canonical field mappings.",
+  "datasets": {
+    "medfact_synth": {
+      "raw_format": "parquet",
+      "raw_path_glob": "data/raw/v1/medfact_synth/data/*.parquet",
+      "roles": [
+        "judged_article_ranking",
+        "open_corpus_retrieval",
+        "five_level_stance"
+      ],
+      "fields": {
+        "row_id": "idx",
+        "claim_source_id": "claim_pmid",
+        "claim_potential": "claim_potential",
+        "claim_text": "claim",
+        "article_source_id": "source_pmid",
+        "article_text": "source",
+        "stance_label": "synthetic_label"
+      },
+      "derived_fields": {
+        "relevance_grade": "abs(int(synthetic_label))",
+        "is_origin_source": "str(claim_pmid) == str(source_pmid)",
+        "claim_id": "medfact:{claim_pmid}:{sha256(normalized_claim)[:16]}",
+        "split_group_id": "medfact-group:{claim_pmid}:{sha256(normalized_claim)[:16]}",
+        "article_id": "pmid:{source_pmid}",
+        "judgment_id": "medfact-pair:{idx}"
+      },
+      "input_exclusions": [
+        "system_prompt",
+        "user_prompt",
+        "assistant_prompt"
+      ],
+      "judgment_completeness": {
+        "judged_candidate_ranking": "complete only within observed pairs for each claim",
+        "open_corpus": "incomplete; unseen claim-article pairs are UNJUDGED"
+      }
+    },
+    "evidencebench_100k": {
+      "raw_format": "json_object",
+      "raw_paths": {
+        "train": "data/raw/v1/evidencebench_100k/evidencebench_100k_train_set.json",
+        "test": "data/raw/v1/evidencebench_100k/evidencebench_100k_test_set.json"
+      },
+      "roles": [
+        "evidence_sentence_ranking"
+      ],
+      "fields": {
+        "query_text": "hypothesis",
+        "candidate_sentences": "paper_as_candidate_pool",
+        "aspect_ids": "aspect_list_ids",
+        "aspect_text": "aspect_id2aspect",
+        "aspect_to_sentence_indices": "aspect2sentence_indices",
+        "sentence_to_aspects": "sentence_index2aspects",
+        "results_aspect_ids": "results_aspect_list_ids",
+        "sentence_types": "sentence_types_in_candidate_pool",
+        "paper_id": "paper_id",
+        "group_id": "systematic_review_id"
+      },
+      "input_exclusions": [
+        "results_evidence_retrieval_at_5_evaluation",
+        "results_evidence_retrieval_at_optimal_evaluation"
+      ],
+      "index_invariants": [
+        "candidate sentence order is immutable",
+        "sentence indices are zero-based",
+        "all gold indices must be inside candidate pool"
+      ]
+    },
+    "healthfc": {
+      "raw_format": "csv",
+      "raw_path": "data/raw/v1/healthfc/Datensatz.csv",
+      "roles": [
+        "expert_verdict_evaluation"
+      ],
+      "fields": {
+        "claim_text": "en_claim",
+        "evidence_text": "en_top_sentences",
+        "label": "label",
+        "explanation": "en_explanation",
+        "authors": "authors",
+        "date": "date",
+        "source_url": "url"
+      },
+      "input_fields": [
+        "en_claim",
+        "en_top_sentences"
+      ],
+      "input_exclusions": [
+        "en_explanation",
+        "label",
+        "de_verdict"
+      ],
+      "usage": "external expert evaluation only"
+    }
+  }
+}

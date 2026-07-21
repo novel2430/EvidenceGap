@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "task_id": "VERDICT-HEALTHFC-3",
+  "record_type": "ExpertVerdictRecord",
+  "case_id": "healthfc:f762cccafade2f4c",
+  "dataset": "healthfc",
+  "claim": "Can masks reduce corona infections when worn by a large proportion of the population?",
+  "evidence_text": "Studies show slow spread After three years of pandemic, there are now relatively meaningful data that masks can slow down the spread of the Corona virus. Surgical masks, in turn, seem to reduce the risk of infecting themselves with the corona virus.",
+  "label_id": 0,
+  "verdict": "SUPPORTED",
+  "explanation": "International studies suggest that the number of corona infections decreases when many people wear masks - whether fabric, surgical or FFP2 masks. However, it is not possible to precisely quantify how great the protective effect actually is. It probably depends on the type of masks and the proportion of people who wear them.",
+  "source_url": "https://www.medizin-transparent.at/masken-corona/",
+  "authors": "Bernd Kerschner,Jana Meixner",
+  "date": "5. Dezember 2022",
+  "contract_version": "1.0.0",
+  "raw_locator": {
+    "path": "data/raw/v1/healthfc/Datensatz.csv",
+    "record_id": "0"
+  }
+}

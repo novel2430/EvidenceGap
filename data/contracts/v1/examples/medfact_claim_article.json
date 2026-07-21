@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0.0",
+  "task_ids": [
+    "AR-MEDFACT-JUDGED",
+    "STANCE-MEDFACT-5"
+  ],
+  "claim": {
+    "record_type": "ClaimRecord",
+    "claim_id": "medfact:30588127:90b4c7c223f3ebd2",
+    "dataset": "medfact_synth",
+    "text": "An educational intervention using fear appeals can significantly improve attitudes and behavioral intentions towards early breast cancer diagnosis among women, but it does not influence actual early diagnosis rates.",
+    "source_reference": {
+      "type": "pmid",
+      "value": "30588127"
+    },
+    "split_group_id": "medfact-group:30588127:90b4c7c223f3ebd2",
+    "contract_version": "1.0.0",
+    "raw_locator": {
+      "path": "data/raw/v1/medfact_synth/data/train-00000-of-00017.parquet",
+      "record_id": "0",
+      "shard": "train-00000-of-00017.parquet"
+    }
+  },
+  "article": {
+    "record_type": "ArticleRecord",
+    "article_id": "pmid:30588127",
+    "dataset": "medfact_synth",
+    "pmid": "30588127",
+    "text": "An educational intervention based on the extended parallel process model to improve attitude, behavioral intention, and early breast cancer diagnosis: a randomized trial.\nBackground: Breast cancer is an important public health problem worldwide. This study aimed to assess the effectiveness of an educational intervention based on fear appeals using the extended parallel process model (EPPM) to improve attitudes, intention, and early breast cancer diagnosis in Iranian women. Methods: This was a cluster-randomized trial conducted in Tehran, Iran. A sample of women 40 years old and above was recruited and assigned either to intervention group or to control group. The intervention group received two pamphlets containing fear appeals specially designed for this study using the EPPM. The control group received nothing. The primary outcomes were changes in attitude, behavioral intention, and early breast cancer diagnosis. Participants responded to a questionnaire before intervention and at 3 months follow-up assessments. Independent  Result: In all, 600 women were entered into the study (277 in the intervention group and 323 in the control group). Of these, 162 were lost to follow-up assessment. Thus, the analysis was restricted to those for whom both baseline and follow-up information was available (n=438). The mean age of participants was 53.2 (SD=9.45) years, and the mean year education of participants was 9.4 (SD=4.12) years. There were no significant differences between two groups regarding demographic variables. However, comparing outcome variables (attitude, intention, and early breast cancer diagnosis) at baseline and follow-up assessments, we found that the intervention group showed significant improvements in attitude and intention ( Conclusion: The findings showed that fear appeals could not influence early breast cancer diagnosis among women. However, significant changes were observed for attitude and behavioral intention.",
+    "contract_version": "1.0.0",
+    "raw_locator": {
+      "path": "data/raw/v1/medfact_synth/data/train-00000-of-00017.parquet",
+      "record_id": "0",
+      "shard": "train-00000-of-00017.parquet"
+    }
+  },
+  "judgment": {
+    "record_type": "ClaimArticleJudgment",
+    "judgment_id": "medfact-pair:0",
+    "claim_id": "medfact:30588127:90b4c7c223f3ebd2",
+    "article_id": "pmid:30588127",
+    "stance_label": 2,
+    "relevance_grade": 2,
+    "is_origin_source": true,
+    "claim_potential": "support",
+    "dataset": "medfact_synth",
+    "contract_version": "1.0.0",
+    "raw_locator": {
+      "path": "data/raw/v1/medfact_synth/data/train-00000-of-00017.parquet",
+      "record_id": "0",
+      "shard": "train-00000-of-00017.parquet"
+    }
+  }
+}
