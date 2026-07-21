@@ -47,3 +47,4 @@ models/v1/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+artifacts/
