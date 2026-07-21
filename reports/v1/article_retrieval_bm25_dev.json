@@ -1,0 +1,72 @@
+{
+  "caveats": [
+    "Open-corpus metrics use incomplete judgments and treat only known positives as gold.",
+    "Unjudged articles are not counted as confirmed negatives.",
+    "Independent-source is the primary track; origin-source is a sanity check."
+  ],
+  "created_at": "2026-07-21T08:27:48.789726+00:00",
+  "files": {
+    "judged_independent": "artifacts/v1/article_retrieval_runs/dev_judged_independent_bm25s_default.trec",
+    "judged_origin": "artifacts/v1/article_retrieval_runs/dev_judged_origin_bm25s_default.trec",
+    "judged_overall": "artifacts/v1/article_retrieval_runs/dev_judged_overall_bm25s_default.trec",
+    "open_independent": "artifacts/v1/article_retrieval_runs/dev_open_independent_bm25s_default.trec",
+    "open_origin": "artifacts/v1/article_retrieval_runs/dev_open_origin_bm25s_default.trec",
+    "open_overall": "artifacts/v1/article_retrieval_runs/dev_open_overall_bm25s_default.trec"
+  },
+  "queries_loaded": 26644,
+  "query_limit": null,
+  "run_name": "bm25s_default",
+  "schema_version": "1.0.0",
+  "split": "dev",
+  "top_k": 100,
+  "tracks": {
+    "independent": {
+      "eligible_queries": 20641,
+      "judged_candidate_ranking": {
+        "mrr": 0.90063466,
+        "ndcg@10": 0.89196536,
+        "recall@10": 1.0,
+        "recall@50": 1.0
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.66435735,
+        "hitrate@100": 0.87316506,
+        "known_positive_recall@10": 0.5520259,
+        "known_positive_recall@100": 0.80428678,
+        "known_positive_recall@50": 0.7435008
+      }
+    },
+    "origin": {
+      "eligible_queries": 13758,
+      "judged_candidate_ranking": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "recall@10": 1.0,
+        "recall@50": 1.0
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.99425789,
+        "hitrate@100": 0.99970926,
+        "known_positive_recall@10": 0.99425789,
+        "known_positive_recall@100": 0.99970926,
+        "known_positive_recall@50": 0.99934584
+      }
+    },
+    "overall": {
+      "eligible_queries": 25598,
+      "judged_candidate_ranking": {
+        "mrr": 0.95788408,
+        "ndcg@10": 0.93977084,
+        "recall@10": 1.0,
+        "recall@50": 1.0
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.84678491,
+        "hitrate@100": 0.94538636,
+        "known_positive_recall@10": 0.69598471,
+        "known_positive_recall@100": 0.86896437,
+        "known_positive_recall@50": 0.82794098
+      }
+    }
+  }
+}

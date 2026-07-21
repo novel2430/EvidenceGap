@@ -62,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--top-k", type=int, default=100)
     run.add_argument("--max-queries", type=int)
     run.add_argument("--run-name", default="bm25s_default")
+    run.add_argument(
+        "--reuse-run",
+        action="store_true",
+        help="Recompute metrics from existing TREC files without rerunning retrieval",
+    )
 
     validate = sub.add_parser("validate", help="Validate corpus and index")
     add_common_root(validate)
@@ -121,6 +126,7 @@ def main() -> None:
             top_k=args.top_k,
             max_queries=args.max_queries,
             run_name=args.run_name,
+            reuse_run=args.reuse_run,
         )
         print(json.dumps(result["tracks"], ensure_ascii=False, indent=2))
         return
