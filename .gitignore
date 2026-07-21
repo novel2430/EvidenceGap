@@ -35,3 +35,12 @@ tmp/
 /data/raw/
 /data/processed/
 /data/indexes/
+
+# Downloaded V1 datasets
+data/raw/v1/
+data/processed/v1/
+
+# Downloaded EvidenceGap V1 models
+models/v1/
+
+.venv/
