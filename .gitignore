@@ -44,3 +44,6 @@ data/processed/v1/
 models/v1/
 
 .venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
