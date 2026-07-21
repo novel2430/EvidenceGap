@@ -459,11 +459,6 @@ def run_article_retrieval(
         raise EvidenceGapError(
             "top_k must be at least 100 because the evaluation reports Recall@100"
         )
-    if reuse_run and max_queries is not None:
-        raise EvidenceGapError(
-            "--reuse-run cannot be combined with --max-queries because saved runs "
-            "do not encode the original query limit"
-        )
 
     root = root.resolve()
     corpus_dir = (root / (corpus_dir or DEFAULT_CORPUS_DIR)).resolve()

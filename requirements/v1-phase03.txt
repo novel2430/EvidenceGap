@@ -1,0 +1,8 @@
+# EvidenceGap V1 Phase 03 dense article retrieval
+# Install after the CUDA-compatible PyTorch wheel already used by this project.
+numpy>=1.26,<3
+pyarrow>=16,<22
+duckdb>=1.0,<2
+faiss-cpu>=1.8,<2
+transformers>=4.44,<6
+safetensors>=0.4
