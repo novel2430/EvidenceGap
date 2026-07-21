@@ -1,0 +1,1061 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-07-21T04:57:31.290200+00:00",
+  "datasets": {
+    "medfact_synth": {
+      "rows": 1497981,
+      "shards": 17,
+      "columns": [
+        "idx",
+        "claim_pmid",
+        "claim_potential",
+        "claim",
+        "source_pmid",
+        "source",
+        "synthetic_label",
+        "system_prompt",
+        "user_prompt",
+        "assistant_prompt"
+      ],
+      "null_counts": {
+        "idx": 0,
+        "claim_pmid": 0,
+        "claim_potential": 0,
+        "claim": 0,
+        "source_pmid": 0,
+        "source": 0,
+        "synthetic_label": 0,
+        "assistant_prompt": 0
+      },
+      "synthetic_label_counts": {
+        "-1.0": 111819,
+        "-2.0": 266667,
+        "0.0": 545603,
+        "1.0": 228047,
+        "2.0": 345845
+      },
+      "claim_potential_counts": {
+        "refute": 627123,
+        "support": 870858
+      },
+      "unique_claim_pmids": 426440,
+      "unique_source_pmids": 1320128,
+      "same_claim_source_pmid_rows": 273374,
+      "same_claim_source_pmid_ratio": 0.182495,
+      "samples": [
+        {
+          "idx": 0,
+          "claim_pmid": "30588127",
+          "claim_potential": "support",
+          "claim": "An educational intervention using fear appeals can significantly improve attitudes and behavioral intentions towards early breast cancer diagnosis among women, but it does not influence actual early diagnosis rates.",
+          "source_pmid": "30588127",
+          "source": "An educational intervention based on the extended parallel process model to improve attitude, behavioral intention, and early breast cancer diagnosis: a randomized trial.\nBackground: Breast cancer is an important public health problem worldwide. This study aimed to assess the effectiveness of an educational intervention based on fear appeals using the extended parallel process model (EPPM) to impr…",
+          "synthetic_label": 2.0,
+          "assistant_prompt": "<think>The article discusses a randomized trial that assessed the effectiveness of an educational intervention based on fear appeals using the extended parallel process model (EPPM) to improve attitudes, intention, and early breast cancer diagnosis in Iranian women. The results showed that the intervention group had significant improvements in attitude and intention, but no significant influence o…"
+        },
+        {
+          "idx": 1,
+          "claim_pmid": "30588127",
+          "claim_potential": "support",
+          "claim": "An educational intervention using fear appeals can significantly improve attitudes and behavioral intentions towards early breast cancer diagnosis among women, but it does not influence actual early diagnosis rates.",
+          "source_pmid": "24523424",
+          "source": "A systematic review of barriers to early presentation and diagnosis with breast cancer among black women.\nOBJECTIVE: To explore barriers to early presentation and diagnosis with breast cancer among black women. DESIGN: Systematic review. METHODS: We searched multiple bibliographic databases (January 1991-February 2013) for primary research, published in English, conducted in developed countries an…",
+          "synthetic_label": 0.0,
+          "assistant_prompt": "<think>The article discusses barriers to early presentation and diagnosis with breast cancer among black women, highlighting factors such as poor symptom and risk factor knowledge, fear of detecting breast abnormality, and fear of cancer treatments. The claim, on the other hand, talks about the effectiveness of an educational intervention using fear appeals in improving attitudes and behavioral in…"
+        },
+        {
+          "idx": 2,
+          "claim_pmid": "30588127",
+          "claim_potential": "support",
+          "claim": "An educational intervention using fear appeals can significantly improve attitudes and behavioral intentions towards early breast cancer diagnosis among women, but it does not influence actual early diagnosis rates.",
+          "source_pmid": "30604386",
+          "source": "The Effect of Educational Intervention Based on the Theory of Planned Behavior on Mammography Screening in Iranian Women.\nMammography is the most special screening method for early diagnosis of breast cancer. The purpose of present research is investigating the effect of educational intervention based on theory of planned behavior on mammography screening of women in Fasa city, Fars province, Iran…",
+          "synthetic_label": -1.0,
+          "assistant_prompt": "<think>The article discusses an educational intervention based on the theory of planned behavior aimed at improving mammography screening among women. It provides evidence that the intervention led to significant increases in knowledge, perceived behavioral control, subjective norms, and attitudes towards mammography, as well as a notable increase in the actual performance of mammography among the…"
+        }
+      ]
+    },
+    "evidencebench_100k": {
+      "rows": 107461,
+      "common_fields": [
+        "aspect2sentence_indices",
+        "aspect_id2aspect",
+        "aspect_list_ids",
+        "hypothesis",
+        "paper_as_candidate_pool",
+        "paper_id",
+        "results_aspect_list_ids",
+        "results_evidence_retrieval_at_5_evaluation",
+        "results_evidence_retrieval_at_optimal_evaluation",
+        "sentence_index2aspects",
+        "sentence_types_in_candidate_pool",
+        "systematic_review_id"
+      ],
+      "train": {
+        "rows": 87461,
+        "bytes": 2969415337,
+        "container": "object",
+        "field_presence": {
+          "hypothesis": 87461,
+          "paper_as_candidate_pool": 87461,
+          "aspect_list_ids": 87461,
+          "aspect_id2aspect": 87461,
+          "results_aspect_list_ids": 87461,
+          "aspect2sentence_indices": 87461,
+          "sentence_index2aspects": 87461,
+          "results_evidence_retrieval_at_optimal_evaluation": 87461,
+          "results_evidence_retrieval_at_5_evaluation": 87461,
+          "sentence_types_in_candidate_pool": 87461,
+          "paper_id": 87461,
+          "systematic_review_id": 87461
+        },
+        "field_types": {
+          "aspect2sentence_indices": {
+            "dict": 87461
+          },
+          "aspect_id2aspect": {
+            "dict": 87461
+          },
+          "aspect_list_ids": {
+            "list": 87461
+          },
+          "hypothesis": {
+            "str": 87461
+          },
+          "paper_as_candidate_pool": {
+            "list": 87461
+          },
+          "paper_id": {
+            "str": 87461
+          },
+          "results_aspect_list_ids": {
+            "NoneType": 87461
+          },
+          "results_evidence_retrieval_at_5_evaluation": {
+            "NoneType": 87461
+          },
+          "results_evidence_retrieval_at_optimal_evaluation": {
+            "NoneType": 87461
+          },
+          "sentence_index2aspects": {
+            "dict": 87461
+          },
+          "sentence_types_in_candidate_pool": {
+            "list": 87461
+          },
+          "systematic_review_id": {
+            "str": 87461
+          }
+        },
+        "key_signatures": [
+          {
+            "keys": [
+              "aspect2sentence_indices",
+              "aspect_id2aspect",
+              "aspect_list_ids",
+              "hypothesis",
+              "paper_as_candidate_pool",
+              "paper_id",
+              "results_aspect_list_ids",
+              "results_evidence_retrieval_at_5_evaluation",
+              "results_evidence_retrieval_at_optimal_evaluation",
+              "sentence_index2aspects",
+              "sentence_types_in_candidate_pool",
+              "systematic_review_id"
+            ],
+            "rows": 87461
+          }
+        ],
+        "samples": [
+          {
+            "_record_id": "train_0",
+            "hypothesis": "Reducing exposure to house dust prevents the development of asthma in high-risk children.",
+            "paper_as_candidate_pool": [
+              "Objective",
+              "Home dampness and the presence of mold and allergens have been associated with asthma morbidity.",
+              "We examined changes in asthma morbidity in children as a result of home remediation aimed at moisture sources.",
+              "Design",
+              "In this prospective, randomized controlled trial, symptomatic, asthmatic children (n = 62), 2–17 years of age, living in a home with indoor mold, received an asthma intervention including an action plan, education, and individualized problem solving.",
+              "The remediation group also received household repairs, including reduction of water infiltration, removal of water-damaged building materials, and heating/ventilation/air-conditioning alterations.",
+              "The control group received only home cleaning information.",
+              "We measured children’s total and allergen-specific serum immuno-globulin E, peripheral blood eosinophil counts, and urinary cotinine."
+            ],
+            "aspect_list_ids": [
+              "train_0_aspect_0",
+              "train_0_aspect_1",
+              "train_0_aspect_2",
+              "train_0_aspect_3",
+              "train_0_aspect_4"
+            ],
+            "aspect_id2aspect": {
+              "train_0_aspect_0": "The control group consisted of 33 participants.",
+              "train_0_aspect_1": "The intervention group consisted of 29 participants.",
+              "train_0_aspect_2": "The control group received information to improve home indoor air quality.",
+              "train_0_aspect_3": "The intervention group underwent home remediation performed 4–5 months after the study began, including cleaning, repairs, air conditioning, etc.",
+              "train_0_aspect_4": "The measured outcome was improvement."
+            },
+            "results_aspect_list_ids": null,
+            "aspect2sentence_indices": {
+              "train_0_aspect_0": [
+                13,
+                119
+              ],
+              "train_0_aspect_1": [
+                119
+              ],
+              "train_0_aspect_2": [
+                6,
+                77
+              ],
+              "train_0_aspect_3": [
+                70
+              ],
+              "train_0_aspect_4": [
+                224
+              ]
+            },
+            "sentence_index2aspects": {
+              "0": [],
+              "1": [],
+              "2": [],
+              "3": [],
+              "4": [],
+              "5": [],
+              "6": [
+                "train_0_aspect_2"
+              ],
+              "7": [],
+              "8": [],
+              "9": [],
+              "10": [],
+              "11": [],
+              "12": [],
+              "13": [
+                "train_0_aspect_0"
+              ],
+              "14": [],
+              "15": [],
+              "16": [],
+              "17": [],
+              "18": [],
+              "19": [],
+              "20": [],
+              "21": [],
+              "22": [],
+              "23": [],
+              "24": [],
+              "25": [],
+              "26": [],
+              "27": [],
+              "28": [],
+              "29": []
+            },
+            "results_evidence_retrieval_at_optimal_evaluation": null,
+            "results_evidence_retrieval_at_5_evaluation": null,
+            "sentence_types_in_candidate_pool": [
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract"
+            ],
+            "paper_id": "pmc_1626393",
+            "systematic_review_id": "18087584"
+          },
+          {
+            "_record_id": "train_1",
+            "hypothesis": "Higher sensitivity and specificity in bioterrorism agent detection systems lead to increased effectiveness in identifying potential threats.",
+            "paper_as_candidate_pool": [
+              "On Thursday, October 4, 2001, just 24 days after the tragic events of September 11, the Florida Department of Health and the Centers for Disease Control and Prevention (CDC) confirmed the first case of inhalational anthrax in the United States in more than 25 years.",
+              "Recognition of this unexpected case is attributed to the alertness of local infectious disease physician Larry Bush, who promptly notified Jean Malecki, director, Palm Beach County Health Department.",
+              "By Saturday, October 6, a team of federal, state, and local public health and local law enforcement investigators identified intentional Bacillus anthracis spore contamination at the patient’s workplace.",
+              "These events marked the beginning of the first U.S. outbreak of bioterrorism-related anthrax and (for many of us in clinical medicine, public health, and law enforcement) ushered in the transition from tabletop bioterrorism exercises to real-world investigation and response.",
+              "Contingency plans to mitigate bioterrorism-related anthrax outbreaks go back to August 1998, when CDC hosted the “Workshop on Improving Public Health Response to Possible Acts of Bioterrorism.”",
+              "This workshop brought together state and local health departments, public health professional organizations, the U.S. Department of Defense, and the U.S. Department of Justice to examine ways of improving public health preparedness for bioterrorism (CDC, unpub. data).",
+              "Two investments made as a result of this workshop were the Laboratory Response Network for Bioterrorism and the National Pharmaceutical Stockpile.",
+              "These early investments were key components of the public health response to the 2001 bioterrorism-related anthrax outbreak."
+            ],
+            "aspect_list_ids": [
+              "train_1_aspect_0",
+              "train_1_aspect_1",
+              "train_1_aspect_2",
+              "train_1_aspect_3"
+            ],
+            "aspect_id2aspect": {
+              "train_1_aspect_0": "FLAPS-2 was able to detect 39 of 40 blind releases of stimulant aerosols.",
+              "train_1_aspect_1": "The particle size range for the stimulant aerosols was from 0.5 to 15 μm.",
+              "train_1_aspect_2": "Detection was performed at a distance of about 1 km with no false alarms during a 3-week period.",
+              "train_1_aspect_3": "In another trial, FLAPS-2 was able to detect as few as 10 agent-containing particles per liter of air."
+            },
+            "results_aspect_list_ids": null,
+            "aspect2sentence_indices": {
+              "train_1_aspect_0": [],
+              "train_1_aspect_1": [],
+              "train_1_aspect_2": [],
+              "train_1_aspect_3": []
+            },
+            "sentence_index2aspects": {
+              "0": [],
+              "1": [],
+              "2": [],
+              "3": [],
+              "4": [],
+              "5": [],
+              "6": [],
+              "7": [],
+              "8": [],
+              "9": [],
+              "10": [],
+              "11": [],
+              "12": [],
+              "13": [],
+              "14": [],
+              "15": [],
+              "16": [],
+              "17": [],
+              "18": [],
+              "19": [],
+              "20": [],
+              "21": [],
+              "22": [],
+              "23": [],
+              "24": [],
+              "25": [],
+              "26": [],
+              "27": [],
+              "28": [],
+              "29": []
+            },
+            "results_evidence_retrieval_at_optimal_evaluation": null,
+            "results_evidence_retrieval_at_5_evaluation": null,
+            "sentence_types_in_candidate_pool": [
+              "normal paragraph",
+              "normal paragraph",
+              "normal paragraph",
+              "normal paragraph",
+              "normal paragraph",
+              "normal paragraph",
+              "normal paragraph",
+              "normal paragraph"
+            ],
+            "paper_id": "pmc_2730302",
+            "systematic_review_id": "15078604"
+          },
+          {
+            "_record_id": "train_2",
+            "hypothesis": "The adoption of personal digital assistants (PDAs) is increasing among health care providers, particularly pharmacists.",
+            "paper_as_candidate_pool": [
+              "Background",
+              "To use technology effectively for the advancement of patient care, pharmacists must possess a variety of computer skills.",
+              "We recently introduced a novel applied informatics program in this Canadian hospital clinical service unit to enhance the informatics skills of our members.",
+              "Objective",
+              "This study was conducted to gain a better understanding of the baseline computer skills and needs of our hospital pharmacists immediately prior to the implementation of an applied informatics program.",
+              "Methods",
+              "In May 2001, an 84-question written survey was distributed by mail to 106 practicing hospital pharmacists in our multi-site, 1500-bed, acute-adult-tertiary care Canadian teaching hospital in Vancouver, British Columbia.",
+              "Results"
+            ],
+            "aspect_list_ids": [
+              "train_2_aspect_0",
+              "train_2_aspect_1",
+              "train_2_aspect_2",
+              "train_2_aspect_3",
+              "train_2_aspect_4",
+              "train_2_aspect_5",
+              "train_2_aspect_6"
+            ],
+            "aspect_id2aspect": {
+              "train_2_aspect_0": "The prevalence of PDA use was 33% (use at work or home).",
+              "train_2_aspect_1": "The data was collected in May 2001.",
+              "train_2_aspect_2": "The survey methodology used was a mail survey.",
+              "train_2_aspect_3": "The study involved practicing hospital pharmacists.",
+              "train_2_aspect_4": "The sample size was 106, with 58 completed responses, resulting in a response rate of 55%.",
+              "train_2_aspect_5": "33% of respondents reported using PDAs at work or home.",
+              "train_2_aspect_6": "28% of respondents used a device daily."
+            },
+            "results_aspect_list_ids": null,
+            "aspect2sentence_indices": {
+              "train_2_aspect_0": [],
+              "train_2_aspect_1": [
+                6,
+                33
+              ],
+              "train_2_aspect_2": [
+                6
+              ],
+              "train_2_aspect_3": [
+                4,
+                6,
+                32,
+                35,
+                47
+              ],
+              "train_2_aspect_4": [
+                8,
+                54
+              ],
+              "train_2_aspect_5": [],
+              "train_2_aspect_6": [
+                68
+              ]
+            },
+            "sentence_index2aspects": {
+              "0": [],
+              "1": [],
+              "2": [],
+              "3": [],
+              "4": [
+                "train_2_aspect_3"
+              ],
+              "5": [],
+              "6": [
+                "train_2_aspect_1",
+                "train_2_aspect_2",
+                "train_2_aspect_3"
+              ],
+              "7": [],
+              "8": [
+                "train_2_aspect_4"
+              ],
+              "9": [],
+              "10": [],
+              "11": [],
+              "12": [],
+              "13": [],
+              "14": [],
+              "15": [],
+              "16": [],
+              "17": [],
+              "18": [],
+              "19": [],
+              "20": [],
+              "21": [],
+              "22": [],
+              "23": [],
+              "24": [],
+              "25": [],
+              "26": [],
+              "27": [],
+              "28": [],
+              "29": []
+            },
+            "results_evidence_retrieval_at_optimal_evaluation": null,
+            "results_evidence_retrieval_at_5_evaluation": null,
+            "sentence_types_in_candidate_pool": [
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract"
+            ],
+            "paper_id": "pmc_1550586",
+            "systematic_review_id": "16867970"
+          }
+        ]
+      },
+      "test": {
+        "rows": 20000,
+        "bytes": 676872081,
+        "container": "object",
+        "field_presence": {
+          "hypothesis": 20000,
+          "paper_as_candidate_pool": 20000,
+          "aspect_list_ids": 20000,
+          "aspect_id2aspect": 20000,
+          "results_aspect_list_ids": 20000,
+          "aspect2sentence_indices": 20000,
+          "sentence_index2aspects": 20000,
+          "results_evidence_retrieval_at_optimal_evaluation": 20000,
+          "results_evidence_retrieval_at_5_evaluation": 20000,
+          "sentence_types_in_candidate_pool": 20000,
+          "paper_id": 20000,
+          "systematic_review_id": 20000
+        },
+        "field_types": {
+          "aspect2sentence_indices": {
+            "dict": 20000
+          },
+          "aspect_id2aspect": {
+            "dict": 20000
+          },
+          "aspect_list_ids": {
+            "list": 20000
+          },
+          "hypothesis": {
+            "str": 20000
+          },
+          "paper_as_candidate_pool": {
+            "list": 20000
+          },
+          "paper_id": {
+            "str": 20000
+          },
+          "results_aspect_list_ids": {
+            "NoneType": 20000
+          },
+          "results_evidence_retrieval_at_5_evaluation": {
+            "NoneType": 20000
+          },
+          "results_evidence_retrieval_at_optimal_evaluation": {
+            "NoneType": 20000
+          },
+          "sentence_index2aspects": {
+            "dict": 20000
+          },
+          "sentence_types_in_candidate_pool": {
+            "list": 20000
+          },
+          "systematic_review_id": {
+            "str": 20000
+          }
+        },
+        "key_signatures": [
+          {
+            "keys": [
+              "aspect2sentence_indices",
+              "aspect_id2aspect",
+              "aspect_list_ids",
+              "hypothesis",
+              "paper_as_candidate_pool",
+              "paper_id",
+              "results_aspect_list_ids",
+              "results_evidence_retrieval_at_5_evaluation",
+              "results_evidence_retrieval_at_optimal_evaluation",
+              "sentence_index2aspects",
+              "sentence_types_in_candidate_pool",
+              "systematic_review_id"
+            ],
+            "rows": 20000
+          }
+        ],
+        "samples": [
+          {
+            "_record_id": "test_4850",
+            "hypothesis": "Chlamydia pneumoniae DNA in peripheral blood mononuclear cells is associated with cardiovascular disease.",
+            "paper_as_candidate_pool": [
+              "Background",
+              "The prevalence and role of Chlamydia pneumoniae in chronic obstructive pulmonary disease (COPD) remain unclear.",
+              "Methods",
+              "Peripheral blood mononuclear cells were obtained from 100 outpatients with smoking-related, clinically stable COPD, and induced sputum was obtained in 62 patients.",
+              "Results",
+              "Patients had mean age (standard deviation) of 65.8 (10.7) years, mean forced expiratory volume in one second of 1.34 (0.61) L, and 61 (61.0%) were male.",
+              "C. pneumoniae nucleic acids were detected by nested polymerase chain reaction in 27 (27.0%).",
+              "Current smoking (odds ratio {OR} = 2.6, 95% confidence interval {CI}: 1.1, 6.6, P = 0.04), season (November to April) (OR = 3.6, 95% CI: 1.4, 9.2, P = 0.007), and chronic sputum production (OR = 6.4, 95% CI: 1.8, 23.2, P = 0.005) were associated with detection of C. pneumoniae DNA."
+            ],
+            "aspect_list_ids": [
+              "test_4850_aspect_0",
+              "test_4850_aspect_1",
+              "test_4850_aspect_2"
+            ],
+            "aspect_id2aspect": {
+              "test_4850_aspect_0": "Blood sampling was performed using an 8 mL CPT tube.",
+              "test_4850_aspect_1": "DNA extraction was conducted using QIAamp DNA extraction.",
+              "test_4850_aspect_2": "The PCR target for the study was Nested MOMP."
+            },
+            "results_aspect_list_ids": null,
+            "aspect2sentence_indices": {
+              "test_4850_aspect_0": [
+                46
+              ],
+              "test_4850_aspect_1": [
+                49
+              ],
+              "test_4850_aspect_2": []
+            },
+            "sentence_index2aspects": {
+              "0": [],
+              "1": [],
+              "2": [],
+              "3": [],
+              "4": [],
+              "5": [],
+              "6": [],
+              "7": [],
+              "8": [],
+              "9": [],
+              "10": [],
+              "11": [],
+              "12": [],
+              "13": [],
+              "14": [],
+              "15": [],
+              "16": [],
+              "17": [],
+              "18": [],
+              "19": [],
+              "20": [],
+              "21": [],
+              "22": [],
+              "23": [],
+              "24": [],
+              "25": [],
+              "26": [],
+              "27": [],
+              "28": [],
+              "29": []
+            },
+            "results_evidence_retrieval_at_optimal_evaluation": null,
+            "results_evidence_retrieval_at_5_evaluation": null,
+            "sentence_types_in_candidate_pool": [
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract"
+            ],
+            "paper_id": "pmc_117240",
+            "systematic_review_id": "12359046"
+          },
+          {
+            "_record_id": "test_15388",
+            "hypothesis": "Subintimal angioplasty is an effective treatment for critical limb ischemia, particularly in cases involving femoral or femoropopliteal lesions.",
+            "paper_as_candidate_pool": [
+              "Objective",
+              "To present our experience with subintimal angioplasty (SA) for treatment of chronic lower limb ischemia (CLLI) and to assess its effectiveness and durability.",
+              "Materials and Methods",
+              "From April 2003 through June 2005, we treated 40 limbs in 36 patients with CLLI by SA.",
+              "Balloons with or without secondary stent placement appropriate in size to the occluded arteries were used for SA of all lesions, except for iliac lesions where primary stent placement was done.",
+              "The patients were followed for 1-23 months by clinical examination and color Doppler ultrasound and/or CT angiography.",
+              "Technical results and outcomes were retrospectively evaluated.",
+              "The presence of a steep learning curve for performance of SA was also evaluated."
+            ],
+            "aspect_list_ids": [
+              "test_15388_aspect_0",
+              "test_15388_aspect_1",
+              "test_15388_aspect_2",
+              "test_15388_aspect_3",
+              "test_15388_aspect_4",
+              "test_15388_aspect_5",
+              "test_15388_aspect_6",
+              "test_15388_aspect_7"
+            ],
+            "aspect_id2aspect": {
+              "test_15388_aspect_0": "There is a clear definition of the study population.",
+              "test_15388_aspect_1": "There is a clear description of patient characteristics.",
+              "test_15388_aspect_2": "There is a clear description of lesions.",
+              "test_15388_aspect_3": "There is a clear description of the technique.",
+              "test_15388_aspect_4": "Follow-up is not complete.",
+              "test_15388_aspect_5": "There is an objective assessment of patency.",
+              "test_15388_aspect_6": "There is a clear definition of outcomes.",
+              "test_15388_aspect_7": "The study involved 36 patients and 40 limbs.",
+              "test_15388_aspect_8": "The Fontaine grade distribution was as follows: II: 18 (45%), III: 2 (5%), IV: 20 (50%).",
+              "test_15388_aspect_9": "The mean age of patients was 71 years.",
+              "test_15388_aspect_10": "Patient characteristics included: DM: 23 (64%), HT: 30 (83%), Smoking: 20 (56%).",
+              "test_15388_aspect_11": "The location of lesions was as follows: FA-PA: 15 (38%), CA: 15 (38%), FA-CA: 8 (20%).",
+              "test_15388_aspect_12": "The median follow-up duration was 8 months.",
+              "test_15388_aspect_13": "The study used the KMA statistical method.",
+              "test_15388_aspect_14": "The study reported complications in 4 out of 40 cases (10%).",
+              "test_15388_aspect_15": "The primary patency rate was 44% at 12 months."
+            },
+            "results_aspect_list_ids": null,
+            "aspect2sentence_indices": {
+              "test_15388_aspect_0": [
+                30,
+                32,
+                33
+              ],
+              "test_15388_aspect_1": [
+                32,
+                33
+              ],
+              "test_15388_aspect_2": [],
+              "test_15388_aspect_3": [
+                4,
+                55,
+                56,
+                58
+              ],
+              "test_15388_aspect_4": [
+                106,
+                163
+              ],
+              "test_15388_aspect_5": [
+                35,
+                66,
+                127,
+                128,
+                131,
+                134,
+                135,
+                139
+              ],
+              "test_15388_aspect_6": [],
+              "test_15388_aspect_7": [
+                3,
+                30,
+                83,
+                89
+              ],
+              "test_15388_aspect_8": [],
+              "test_15388_aspect_9": [],
+              "test_15388_aspect_10": [
+                0,
+                9,
+                33
+              ],
+              "test_15388_aspect_11": [
+                9,
+                10,
+                26,
+                38,
+                40,
+                58,
+                79,
+                89
+              ],
+              "test_15388_aspect_12": [
+                72
+              ],
+              "test_15388_aspect_13": [
+                80
+              ],
+              "test_15388_aspect_14": [
+                12,
+                56,
+                92,
+                109,
+                149
+              ],
+              "test_15388_aspect_15": [
+                108,
+                139
+              ]
+            },
+            "sentence_index2aspects": {
+              "0": [
+                "test_15388_aspect_10"
+              ],
+              "1": [],
+              "2": [],
+              "3": [
+                "test_15388_aspect_7"
+              ],
+              "4": [
+                "test_15388_aspect_3"
+              ],
+              "5": [],
+              "6": [],
+              "7": [],
+              "8": [],
+              "9": [
+                "test_15388_aspect_10",
+                "test_15388_aspect_11"
+              ],
+              "10": [
+                "test_15388_aspect_11"
+              ],
+              "11": [],
+              "12": [
+                "test_15388_aspect_14"
+              ],
+              "13": [],
+              "14": [],
+              "15": [],
+              "16": [],
+              "17": [],
+              "18": [],
+              "19": [],
+              "20": [],
+              "21": [],
+              "22": [],
+              "23": [],
+              "24": [],
+              "25": [],
+              "26": [
+                "test_15388_aspect_11"
+              ],
+              "27": [],
+              "28": [],
+              "29": []
+            },
+            "results_evidence_retrieval_at_optimal_evaluation": null,
+            "results_evidence_retrieval_at_5_evaluation": null,
+            "sentence_types_in_candidate_pool": [
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract"
+            ],
+            "paper_id": "pmc_2667586",
+            "systematic_review_id": "18414946"
+          },
+          {
+            "_record_id": "test_15481",
+            "hypothesis": "Periodic prompts enhance the effectiveness of limited contact interventions in promoting health behavior change, particularly in nutrition.",
+            "paper_as_candidate_pool": [
+              "Background",
+              "At-risk populations can be reached with Web-based disease prevention and behavior change programs.",
+              "However, such eHealth applications on the Internet need to generate return usage to be effective.",
+              "Limited evidence is available on how continued usage can be encouraged.",
+              "Objective",
+              "This analysis tested whether routine email notification about a nutrition education website promoted more use of the website.",
+              "Methods",
+              "Adults from six rural counties in Colorado and New Mexico, United States (n = 755) participating in a randomized trial and assigned to the intervention group (n = 380) received, over a period of 4 months, email messages alerting them to updates on the website, along with hyperlinks to new content."
+            ],
+            "aspect_list_ids": [
+              "test_15481_aspect_0",
+              "test_15481_aspect_1",
+              "test_15481_aspect_2",
+              "test_15481_aspect_3",
+              "test_15481_aspect_4",
+              "test_15481_aspect_5",
+              "test_15481_aspect_6",
+              "test_15481_aspect_7"
+            ],
+            "aspect_id2aspect": {
+              "test_15481_aspect_0": "The study involved 380 participants.",
+              "test_15481_aspect_1": "The health behavior focused on was nutrition.",
+              "test_15481_aspect_2": "The intervention duration was 4 months.",
+              "test_15481_aspect_3": "The study design was observational, one group, pretest-posttest.",
+              "test_15481_aspect_4": "The intervention consisted of an informational website and reminder emails alerting participants of new content on the website.",
+              "test_15481_aspect_5": "There was no control group.",
+              "test_15481_aspect_6": "There was no follow-up.",
+              "test_15481_aspect_7": "Additional intervention components included online tools: health benefit information, recipes, community directory, and links related to fruit and vegetable intake.",
+              "test_15481_aspect_8": "The study used a prompt frequency of every 5 weeks.",
+              "test_15481_aspect_9": "The medium used for prompts was email.",
+              "test_15481_aspect_10": "There was no tailoring of the prompts.",
+              "test_15481_aspect_11": "A positive association was found between responding to reminder emails and positive dietary change.",
+              "test_15481_aspect_12": "Participants were more likely to visit the site on the day a reminder email was sent.",
+              "test_15481_aspect_13": "Responding to reminder emails was associated with positive dietary change, including increased fruit and vegetable intake."
+            },
+            "results_aspect_list_ids": null,
+            "aspect2sentence_indices": {
+              "test_15481_aspect_0": [
+                7,
+                47,
+                73
+              ],
+              "test_15481_aspect_1": [
+                5,
+                41
+              ],
+              "test_15481_aspect_2": [
+                7,
+                56,
+                73,
+                80,
+                99
+              ],
+              "test_15481_aspect_3": [],
+              "test_15481_aspect_4": [
+                7,
+                37,
+                73
+              ],
+              "test_15481_aspect_5": [],
+              "test_15481_aspect_6": [],
+              "test_15481_aspect_7": [
+                59
+              ],
+              "test_15481_aspect_8": [
+                8,
+                69
+              ],
+              "test_15481_aspect_9": [
+                5,
+                7,
+                18,
+                37,
+                43,
+                69,
+                195
+              ],
+              "test_15481_aspect_10": [],
+              "test_15481_aspect_11": [
+                5,
+                7,
+                8,
+                15,
+                19,
+                89,
+                103,
+                104
+              ],
+              "test_15481_aspect_12": [
+                12,
+                123,
+                124,
+                131,
+                137,
+                188,
+                189
+              ],
+              "test_15481_aspect_13": [
+                15,
+                19,
+                89,
+                103,
+                104,
+                105,
+                106,
+                133
+              ]
+            },
+            "sentence_index2aspects": {
+              "0": [],
+              "1": [],
+              "2": [],
+              "3": [],
+              "4": [],
+              "5": [
+                "test_15481_aspect_1",
+                "test_15481_aspect_9",
+                "test_15481_aspect_11"
+              ],
+              "6": [],
+              "7": [
+                "test_15481_aspect_0",
+                "test_15481_aspect_2",
+                "test_15481_aspect_4",
+                "test_15481_aspect_9",
+                "test_15481_aspect_11"
+              ],
+              "8": [
+                "test_15481_aspect_8",
+                "test_15481_aspect_11"
+              ],
+              "9": [],
+              "10": [],
+              "11": [],
+              "12": [
+                "test_15481_aspect_12"
+              ],
+              "13": [],
+              "14": [],
+              "15": [
+                "test_15481_aspect_11",
+                "test_15481_aspect_13"
+              ],
+              "16": [],
+              "17": [],
+              "18": [
+                "test_15481_aspect_9"
+              ],
+              "19": [
+                "test_15481_aspect_11",
+                "test_15481_aspect_13"
+              ],
+              "20": [],
+              "21": [],
+              "22": [],
+              "23": [],
+              "24": [],
+              "25": [],
+              "26": [],
+              "27": [],
+              "28": [],
+              "29": []
+            },
+            "results_evidence_retrieval_at_optimal_evaluation": null,
+            "results_evidence_retrieval_at_5_evaluation": null,
+            "sentence_types_in_candidate_pool": [
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract",
+              "abstract"
+            ],
+            "paper_id": "pmc_2047284",
+            "systematic_review_id": "19632970"
+          }
+        ]
+      }
+    },
+    "healthfc": {
+      "rows": 750,
+      "columns": [
+        "en_claim",
+        "en_explanation",
+        "en_top_sentences",
+        "de_claim",
+        "de_explanation",
+        "de_top_sentences",
+        "label",
+        "de_verdict",
+        "de_title",
+        "authors",
+        "date",
+        "url"
+      ],
+      "null_counts": {
+        "en_claim": 0,
+        "en_explanation": 9,
+        "en_top_sentences": 0,
+        "de_claim": 0,
+        "de_explanation": 9,
+        "de_top_sentences": 0,
+        "label": 0,
+        "de_verdict": 0,
+        "de_title": 0,
+        "authors": 0,
+        "date": 0,
+        "url": 0
+      },
+      "label_counts": {
+        "0": 202,
+        "1": 423,
+        "2": 125
+      },
+      "duplicate_en_claim_rows": 0,
+      "samples": [
+        {
+          "en_claim": "Can masks reduce corona infections when worn by a large proportion of the population?",
+          "en_explanation": "International studies suggest that the number of corona infections decreases when many people wear masks - whether fabric, surgical or FFP2 masks. However, it is not possible to precisely quantify how great the protective effect actually is. It probably depends on the type of masks and the proportion of people who wear them.",
+          "en_top_sentences": "Studies show slow spread After three years of pandemic, there are now relatively meaningful data that masks can slow down the spread of the Corona virus. Surgical masks, in turn, seem to reduce the risk of infecting themselves with the corona virus.",
+          "de_claim": "Können Masken die Anzahl an Corona-Infektionen verringern, wenn sie von einem großen Teil der Bevölkerung getragen werden?",
+          "de_explanation": "Internationale Studien legen nahe, dass die Zahl an Corona-Infektionen sinkt, wenn viele Menschen Masken tragen – egal ob Stoff-, OP- oder FFP2-Masken. Wie groß der Schutzeffekt tatsächlich ist, lässt sich aber nicht genau beziffern. Er hängt vermutlich von der Art der Masken und dem Anteil der Menschen ab, die sie tragen.",
+          "de_top_sentences": "Studien zeigen gebremste Ausbreitung  Nach drei Jahren Pandemie gibt es mittlerweile relativ aussagekräftige Daten dazu, dass Masken die Ausbreitung des Corona-Virus bremsen können. OP-Masken wiederum scheinen das Risiko so gut wie nicht zu senken, sich selbst mit dem Coronavirus anzustecken.",
+          "label": 0,
+          "de_verdict": "wahrscheinlich",
+          "de_title": "Masken gegen Corona: Wirkt der Mund-Nasen-Schutz? | Medizin Transparent",
+          "authors": "Bernd Kerschner,Jana Meixner",
+          "date": "5. Dezember 2022",
+          "url": "https://www.medizin-transparent.at/masken-corona/"
+        },
+        {
+          "en_claim": "Can homeopathic preparations with Anamirta cocculus help against dizziness?",
+          "en_explanation": "We have found only one study that has investigated this. However, it is so poor that no reliable statement is possible.",
+          "en_top_sentences": "But without success: We could not find any meaningful scientific evidence for effectiveness in dizziness. It is now well proven by studies that homeopathic preparations usually do not work better than a sham medication (placebo) [8]. However, it is not well established that betahistine is effective against dizziness [11.13]. The fact that betahist helps with dizziness is not well documented [11, 1…",
+          "de_claim": "Können homöopathische Präparate mit Anamirta cocculus gegen Schwindel helfen?",
+          "de_explanation": "Wir haben nur eine einzige Studie gefunden, die das untersucht hat. Die ist allerdings so mangelhaft, dass keine verlässliche Aussage möglich ist.",
+          "de_top_sentences": "Doch ohne Erfolg: Aussagekräftige wissenschaftliche Belege für eine Wirksamkeit bei Schwindel konnten wir keine finden. Es ist inzwischen gut durch Studien belegt, dass homöopathische Präparate in der Regel nicht besser wirken als ein Scheinmedikament (Placebo) [8] . Allerdings ist nicht gut belegt, dass Betahistin wirksam gegen Schwindel ist [11,13] . Dass Betahistin bei Schwindel hilft, ist nich…",
+          "label": 1,
+          "de_verdict": "wissenschafliche Beweise fehlen",
+          "de_title": "Cocculus gegen Schwindel: kein Wirknachweis für Homöopathie | Medizin Transparent",
+          "authors": "Iris Mair,Jana Meixner",
+          "date": "17. November 2022",
+          "url": "https://www.medizin-transparent.at/schwindel-homoeopathie-cocculus/"
+        },
+        {
+          "en_claim": "Can zeolite alleviate or prevent health problems?",
+          "en_explanation": "Studies to date cannot provide any evidence that taking zeolite prevents or alleviates complaints. A detoxifying effect is not scientifically plausible.",
+          "en_top_sentences": "However, none of these can provide any evidence – because the studies have no significance (for reasons see section Studies in detail ). It does not find an advantage for zeolite – but the results are hardly meaningful. However, it is not researched whether the regular intake of zeolite can lead to a nutrient deficiency or has an undesirable effect on digestion.",
+          "de_claim": "Kann Zeolith Gesundheitsprobleme lindern oder diesen vorbeugen?",
+          "de_explanation": "Bisherige Studien können keine Hinweise darauf geben, dass die Einnahme von Zeolith Beschwerden vorbeugt oder sie lindert. Eine entgiftende Wirkung ist wissenschaftlich nicht plausibel.",
+          "de_top_sentences": "Hinweise darauf kann jedoch keine davon liefern – denn die Studien besitzen keinerlei Aussagekraft (zur Begründung siehe Abschnitt Studien im Detail ). Einen Vorteil für Zeolith findet sie nicht – die Ergebnisse sind aber kaum aussagekräftig. Ob die regelmäßige Einnahme von Zeolith dadurch zu einem Nährstoffmangel führen kann oder eine unerwünschte Auswirkung auf die Verdauung hat, ist allerdings …",
+          "label": 1,
+          "de_verdict": "wissenschafliche Beweise fehlen",
+          "de_title": "Zeolith: Wirkung zur Entgiftung fragwürdig | Medizin Transparent",
+          "authors": "Bernd Kerschner,Jana Meixner",
+          "date": "27. September 2022",
+          "url": "https://www.medizin-transparent.at/zeolith-wirkung/"
+        }
+      ]
+    }
+  }
+}
