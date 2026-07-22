@@ -1,0 +1,36 @@
+{
+  "canonical_path": "artifacts/v1/evidence_sentence_retrieval/canonical/test_full",
+  "denominator_semantics": {
+    "aspect_recall_at_5": "macro mean over queries with at least one coverable aspect; the denominator is the union of aspects appearing in sentence_index2aspects, matching the official evaluator",
+    "aspect_recall_at_optimal": "macro mean using each query's official optimal budget; when the raw precomputed field is absent, the same minimum set-cover budget is derived exactly from gold aspect mappings",
+    "first_hit_mrr": "macro mean over queries with non-empty coverable_aspect_ids; 1/rank of first sentence linked to any gold aspect, else 0",
+    "results_aspect_recall_at_5": "macro mean only over queries with at least one results aspect that appears in sentence_index2aspects",
+    "sentence_precision_at_5": "macro mean over queries with non-empty coverable_aspect_ids; relevant returned sentences divided by min(5, returned rows), zero for an empty prediction"
+  },
+  "eligible_queries": {
+    "aspect_recall_at_5": 18838,
+    "aspect_recall_at_optimal": 18838,
+    "first_hit_mrr": 18838,
+    "results_aspect_recall_at_5": 0,
+    "sentence_precision_at_5": 18838
+  },
+  "metrics": {
+    "aspect_recall_at_5": 0.20253162907004565,
+    "aspect_recall_at_optimal": 0.1470114541495073,
+    "first_hit_mrr": 0.37838218276506164,
+    "results_aspect_recall_at_5": null,
+    "sentence_precision_at_5": 0.2104257352160417
+  },
+  "run_path": "artifacts/v1/evidence_sentence_retrieval/runs/bmretriever_full_test/ranked_sentences.parquet",
+  "schema_version": "1.0.0",
+  "selected_queries": 20000,
+  "skipped_or_special": {
+    "candidate_pool_lt5_queries": 0,
+    "empty_coverable_aspect_queries": 1162,
+    "empty_prediction_queries": 0,
+    "null_or_empty_results_aspect_queries": 20000,
+    "optimal_unavailable_queries": 0
+  },
+  "split": "test",
+  "task_id": "ESR-EVIDENCEBENCH"
+}

@@ -1,0 +1,129 @@
+{
+  "analysis": "sentence_candidate_complementarity",
+  "depths": {
+    "10": {
+      "aspect_recall_at_candidate_depth": {
+        "bmretriever": 0.32080956264241695,
+        "medcpt": 0.308963750430846,
+        "oracle_best_single_per_query": 0.3809493666508803,
+        "union": 0.3955096867117656,
+        "union_minus_best_global_single": 0.07470012406934867,
+        "union_minus_oracle_best_single_per_query": 0.014560320060885312
+      },
+      "candidate_overlap": {
+        "mean_jaccard": 0.3731026855287329,
+        "mean_overlap_count": 5.19963411845415,
+        "mean_union_size": 14.800365881545849
+      },
+      "depth_per_source": 10,
+      "eligible_queries": 4127,
+      "gold_sentence_candidates": {
+        "bmretriever_mean": 1.8541047335924994,
+        "bmretriever_only_mean": 0.7484564372284472,
+        "medcpt_mean": 1.80768351246284,
+        "medcpt_only_mean": 0.702035216098788,
+        "union_mean": 2.5561399496912873
+      },
+      "query_counts": {
+        "union_better_than_bmretriever": 1142,
+        "union_better_than_both": 413,
+        "union_better_than_medcpt": 1285
+      }
+    },
+    "20": {
+      "aspect_recall_at_candidate_depth": {
+        "bmretriever": 0.46854836326739324,
+        "medcpt": 0.45448100085747983,
+        "oracle_best_single_per_query": 0.5284851113905737,
+        "union": 0.5447799129136364,
+        "union_minus_best_global_single": 0.07623154964624312,
+        "union_minus_oracle_best_single_per_query": 0.01629480152306262
+      },
+      "candidate_overlap": {
+        "mean_jaccard": 0.4479673945970491,
+        "mean_overlap_count": 12.071118225474503,
+        "mean_union_size": 27.928881774525497
+      },
+      "depth_per_source": 20,
+      "eligible_queries": 4127,
+      "gold_sentence_candidates": {
+        "bmretriever_mean": 3.3537617196432654,
+        "bmretriever_only_mean": 1.06448662245598,
+        "medcpt_mean": 3.2853876057626343,
+        "medcpt_only_mean": 0.9961125085753487,
+        "union_mean": 4.3498742282186145
+      },
+      "query_counts": {
+        "union_better_than_bmretriever": 1210,
+        "union_better_than_both": 438,
+        "union_better_than_medcpt": 1353
+      }
+    },
+    "5": {
+      "aspect_recall_at_candidate_depth": {
+        "bmretriever": 0.21006956453492526,
+        "medcpt": 0.19946364100175001,
+        "oracle_best_single_per_query": 0.2618850469617802,
+        "union": 0.271280622223446,
+        "union_minus_best_global_single": 0.061211057688520754,
+        "union_minus_oracle_best_single_per_query": 0.00939557526166579
+      },
+      "candidate_overlap": {
+        "mean_jaccard": 0.31420894449706915,
+        "mean_overlap_count": 2.2149554081865994,
+        "mean_union_size": 7.7850445918134
+      },
+      "depth_per_source": 5,
+      "eligible_queries": 4127,
+      "gold_sentence_candidates": {
+        "bmretriever_mean": 0.9869654699291105,
+        "bmretriever_only_mean": 0.4797621769951978,
+        "medcpt_mean": 0.9707294763320375,
+        "medcpt_only_mean": 0.46352618339812485,
+        "union_mean": 1.4504916533272354
+      },
+      "query_counts": {
+        "union_better_than_bmretriever": 964,
+        "union_better_than_both": 254,
+        "union_better_than_medcpt": 1059
+      }
+    },
+    "50": {
+      "aspect_recall_at_candidate_depth": {
+        "bmretriever": 0.7098221486561398,
+        "medcpt": 0.6937323215077075,
+        "oracle_best_single_per_query": 0.7598871827347615,
+        "union": 0.7708203139367805,
+        "union_minus_best_global_single": 0.060998165280640726,
+        "union_minus_oracle_best_single_per_query": 0.010933131202018997
+      },
+      "candidate_overlap": {
+        "mean_jaccard": 0.5810186817429503,
+        "mean_overlap_count": 36.29773610793506,
+        "mean_union_size": 63.70226389206494
+      },
+      "depth_per_source": 50,
+      "eligible_queries": 4127,
+      "gold_sentence_candidates": {
+        "bmretriever_mean": 6.983764006402927,
+        "bmretriever_only_mean": 1.4351703635947861,
+        "medcpt_mean": 6.868282643494169,
+        "medcpt_only_mean": 1.3196890006860278,
+        "union_mean": 8.303453007088955
+      },
+      "query_counts": {
+        "union_better_than_bmretriever": 1032,
+        "union_better_than_both": 329,
+        "union_better_than_medcpt": 1199
+      }
+    }
+  },
+  "left_name": "bmretriever",
+  "left_path": "artifacts/v1/evidence_sentence_retrieval/runs/bmretriever_full_dev/ranked_sentences.parquet",
+  "right_name": "medcpt",
+  "right_path": "artifacts/v1/evidence_sentence_retrieval/runs/medcpt_full_dev/ranked_sentences.parquet",
+  "schema_version": "1.0.0",
+  "selected_queries": 4373,
+  "split": "dev",
+  "task_id": "ESR-EVIDENCEBENCH"
+}

@@ -1,0 +1,193 @@
+{
+  "caveats": [
+    "Open-corpus metrics use incomplete judgments and treat only known positives as gold.",
+    "Unjudged articles are not counted as confirmed negatives.",
+    "Independent-source is the primary track; origin-source is a sanity check.",
+    "Judged Recall@10 and Recall@50 are retained only for backward compatibility; candidate pools contain at most five articles and these metrics saturate.",
+    "Pairwise ordering accuracy excludes queries whose judged candidates all have the same relevance grade."
+  ],
+  "created_at": "2026-07-21T17:13:14.477740+00:00",
+  "excluded_no_eligible_judgments": 0,
+  "failure_cases": {
+    "count": 7435,
+    "path": "reports/v1/article_retrieval_medcpt_cross_rrf3_k60_d100_full_dev_failures.jsonl",
+    "track": "independent"
+  },
+  "files": {
+    "independent_failure_cases": "reports/v1/article_retrieval_medcpt_cross_rrf3_k60_d100_full_dev_failures.jsonl",
+    "judged_independent": "artifacts/v1/reranking/runs/dev_judged_independent_medcpt_cross_rrf3_k60_d100_full.trec",
+    "judged_origin": "artifacts/v1/reranking/runs/dev_judged_origin_medcpt_cross_rrf3_k60_d100_full.trec",
+    "judged_overall": "artifacts/v1/reranking/runs/dev_judged_overall_medcpt_cross_rrf3_k60_d100_full.trec",
+    "open_independent": "artifacts/v1/reranking/runs/dev_open_independent_medcpt_cross_rrf3_k60_d100_full.trec",
+    "open_origin": "artifacts/v1/reranking/runs/dev_open_origin_medcpt_cross_rrf3_k60_d100_full.trec",
+    "open_overall": "artifacts/v1/reranking/runs/dev_open_overall_medcpt_cross_rrf3_k60_d100_full.trec"
+  },
+  "queries_evaluated": 26644,
+  "queries_in_split": 26644,
+  "queries_with_eligible_judgments": 26644,
+  "query_limit": null,
+  "reranker": {
+    "amp": "fp16",
+    "batch_size": 16,
+    "candidate_path": "artifacts/v1/reranking/candidates/dev_rrf_bm25_medcpt_bmretriever_k60_full.parquet",
+    "candidate_run_name": "rrf_bm25_medcpt_bmretriever_k60_full",
+    "candidate_set_diagnostics": {
+      "independent": {
+        "added_to_reranked": 0,
+        "baseline_top_k_rows": 2064100,
+        "candidate_set_preserved": true,
+        "missing_from_reranked": 0,
+        "reranked_top_k_rows": 2064100
+      },
+      "origin": {
+        "added_to_reranked": 0,
+        "baseline_top_k_rows": 1375800,
+        "candidate_set_preserved": true,
+        "missing_from_reranked": 0,
+        "reranked_top_k_rows": 1375800
+      },
+      "overall": {
+        "added_to_reranked": 0,
+        "baseline_top_k_rows": 2559800,
+        "candidate_set_preserved": true,
+        "missing_from_reranked": 0,
+        "reranked_top_k_rows": 2559800
+      }
+    },
+    "devices": [
+      "cuda:0",
+      "cuda:1",
+      "cuda:2",
+      "cuda:3"
+    ],
+    "max_length": 512,
+    "model_fingerprint": "6c9e98d363ed2be9e997bb993989abe29a2842a3f8527e23a4612e43a62c1450",
+    "model_path": "models/v1/medcpt-cross",
+    "num_shards": 4,
+    "rerank_depth": 100,
+    "rerank_policy": "cross-encoder orders the fused open candidates through rerank_depth; remaining union candidates retain fusion order after that block",
+    "rerank_stats": {
+      "output_candidate_rows": 14031242,
+      "selected_candidate_rows": 6141400,
+      "source_candidate_rows": 14031242
+    },
+    "reranked_candidate_manifest": "artifacts/v1/reranking/reranked_candidates/dev_medcpt_cross_rrf3_k60_d100_full.manifest.json",
+    "rows_scored": 2568943,
+    "score_diagnostics": {
+      "by_relevance_grade": {
+        "0": {
+          "max_score": 16.03125,
+          "mean_score": 4.10831145,
+          "min_score": -16.0,
+          "rows": 26174,
+          "std_score": 7.98888599
+        },
+        "1": {
+          "max_score": 16.03125,
+          "mean_score": 9.97660571,
+          "min_score": -15.484375,
+          "rows": 16942,
+          "std_score": 5.87134938
+        },
+        "2": {
+          "max_score": 16.046875,
+          "mean_score": 13.06502656,
+          "min_score": -14.9296875,
+          "rows": 30961,
+          "std_score": 4.69564662
+        }
+      },
+      "mean_score_monotonic_by_grade": true,
+      "pairwise_grade_pairs": 63380,
+      "pairwise_score_direction_accuracy": 0.81963553,
+      "score_semantics": "raw single logit; higher is more relevant"
+    },
+    "score_semantics": "raw single logit; higher is more relevant",
+    "top_k": 100
+  },
+  "retriever": {
+    "family": "cross_encoder_reranker"
+  },
+  "run_name": "medcpt_cross_rrf3_k60_d100_full",
+  "run_source": "saved_trec",
+  "schema_version": "1.1.0",
+  "split": "dev",
+  "top_k": 100,
+  "tracks": {
+    "independent": {
+      "eligible_queries": 20641,
+      "excluded_no_candidates": 286,
+      "excluded_no_positive": 5717,
+      "judged_candidate_ranking": {
+        "mean_top1_relevance_grade": 1.34329732,
+        "mrr": 0.93002196,
+        "ndcg@10": 0.91478715,
+        "ndcg@3": 0.90565365,
+        "ndcg@5": 0.91478715,
+        "pairwise_ordering_accuracy": 0.75705048,
+        "recall@10": 1.0,
+        "recall@50": 1.0,
+        "top1_positive_rate": 0.86396008
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.91749431,
+        "hitrate@100": 1.0,
+        "known_positive_recall@10": 0.85077273,
+        "known_positive_recall@100": 0.99997578,
+        "known_positive_recall@50": 0.98676986
+      },
+      "pairwise_evaluable_queries": 18674,
+      "queries_with_eligible_judgments": 26644
+    },
+    "origin": {
+      "eligible_queries": 13758,
+      "excluded_no_candidates": 12856,
+      "excluded_no_positive": 30,
+      "judged_candidate_ranking": {
+        "mean_top1_relevance_grade": 1.96438436,
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "ndcg@3": 1.0,
+        "ndcg@5": 1.0,
+        "pairwise_ordering_accuracy": null,
+        "recall@10": 1.0,
+        "recall@50": 1.0,
+        "top1_positive_rate": 1.0
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.99934584,
+        "hitrate@100": 1.0,
+        "known_positive_recall@10": 0.99934584,
+        "known_positive_recall@100": 1.0,
+        "known_positive_recall@50": 0.99992732
+      },
+      "pairwise_evaluable_queries": 0,
+      "queries_with_eligible_judgments": 26644
+    },
+    "overall": {
+      "eligible_queries": 25598,
+      "excluded_no_candidates": 0,
+      "excluded_no_positive": 1046,
+      "judged_candidate_ranking": {
+        "mean_top1_relevance_grade": 1.72032971,
+        "mrr": 0.96900474,
+        "ndcg@10": 0.94961443,
+        "ndcg@3": 0.93763156,
+        "ndcg@5": 0.94961443,
+        "pairwise_ordering_accuracy": 0.84114002,
+        "recall@10": 1.0,
+        "recall@50": 1.0,
+        "top1_positive_rate": 0.93983905
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.95866865,
+        "hitrate@100": 1.0,
+        "known_positive_recall@10": 0.89215759,
+        "known_positive_recall@100": 0.99998047,
+        "known_positive_recall@50": 0.99019455
+      },
+      "pairwise_evaluable_queries": 23942,
+      "queries_with_eligible_judgments": 26644
+    }
+  }
+}

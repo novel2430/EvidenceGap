@@ -1,0 +1,98 @@
+{
+  "analysis": "paired_sentence_run_comparison",
+  "baseline_name": "medcpt",
+  "baseline_path": "artifacts/v1/evidence_sentence_retrieval/runs/medcpt_full_test/ranked_sentences.parquet",
+  "challenger_name": "rrf_bmr20_medcpt20_k10",
+  "challenger_path": "artifacts/v1/evidence_sentence_retrieval/fusion/rrf_bmr20_medcpt20_k10_full_test/ranked_sentences.parquet",
+  "comparisons": {
+    "aspect_recall_at_5": {
+      "baseline_mean": 0.19316943085331717,
+      "bootstrap": {
+        "ci95": [
+          0.01048784876575973,
+          0.015277952546293766
+        ],
+        "clusters": 13363,
+        "probability_mean_delta_gt_0": 1.0,
+        "samples": 10000,
+        "seed": 20260722,
+        "unit": "systematic_review"
+      },
+      "challenger_mean": 0.2060341460406776,
+      "eligible_queries": 18838,
+      "mean_delta": 0.012864715187360256,
+      "paired_query_losses": 2091,
+      "paired_query_ties": 13923,
+      "paired_query_wins": 2824,
+      "relative_delta": 0.06659809023886938
+    },
+    "aspect_recall_at_optimal": {
+      "baseline_mean": 0.1405941087248535,
+      "bootstrap": {
+        "ci95": [
+          0.00793214820003698,
+          0.012061973141453042
+        ],
+        "clusters": 13363,
+        "probability_mean_delta_gt_0": 1.0,
+        "samples": 10000,
+        "seed": 20260722,
+        "unit": "systematic_review"
+      },
+      "challenger_mean": 0.1505688957320865,
+      "eligible_queries": 18838,
+      "mean_delta": 0.009974787007232507,
+      "paired_query_losses": 1954,
+      "paired_query_ties": 14332,
+      "paired_query_wins": 2552,
+      "relative_delta": 0.07094740382581347
+    },
+    "first_hit_mrr": {
+      "baseline_mean": 0.36889062205638695,
+      "bootstrap": {
+        "ci95": [
+          0.013769121282152684,
+          0.02044005072146639
+        ],
+        "clusters": 13363,
+        "probability_mean_delta_gt_0": 1.0,
+        "samples": 10000,
+        "seed": 20260722,
+        "unit": "systematic_review"
+      },
+      "challenger_mean": 0.38590472594133285,
+      "eligible_queries": 18838,
+      "mean_delta": 0.017014103884945786,
+      "paired_query_losses": 6040,
+      "paired_query_ties": 6033,
+      "paired_query_wins": 6765,
+      "relative_delta": 0.046122354073682814
+    },
+    "sentence_precision_at_5": {
+      "baseline_mean": 0.2020596666312664,
+      "bootstrap": {
+        "ci95": [
+          0.012289629815786504,
+          0.01606417909983671
+        ],
+        "clusters": 13363,
+        "probability_mean_delta_gt_0": 1.0,
+        "samples": 10000,
+        "seed": 20260722,
+        "unit": "systematic_review"
+      },
+      "challenger_mean": 0.21623314576917807,
+      "eligible_queries": 18838,
+      "mean_delta": 0.01417347913791253,
+      "paired_query_losses": 2446,
+      "paired_query_ties": 12888,
+      "paired_query_wins": 3504,
+      "relative_delta": 0.07014501891551347
+    }
+  },
+  "primary_metric": "aspect_recall_at_5",
+  "schema_version": "1.0.0",
+  "selected_queries": 20000,
+  "split": "test",
+  "task_id": "ESR-EVIDENCEBENCH"
+}

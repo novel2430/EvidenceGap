@@ -1,0 +1,240 @@
+{
+  "caveats": [
+    "Open-corpus metrics use incomplete judgments and treat only known positives as gold.",
+    "Unjudged articles are not counted as confirmed negatives.",
+    "Independent-source is the primary track; origin-source is a sanity check.",
+    "Judged Recall@10 and Recall@50 are retained only for backward compatibility; candidate pools contain at most five articles and these metrics saturate.",
+    "Pairwise ordering accuracy excludes queries whose judged candidates all have the same relevance grade."
+  ],
+  "created_at": "2026-07-21T16:28:33.737966+00:00",
+  "excluded_no_eligible_judgments": 0,
+  "failure_cases": {
+    "count": 8331,
+    "path": "reports/v1/article_retrieval_rrf_bm25_medcpt_bmretriever_k60_full_dev_failures.jsonl",
+    "track": "independent"
+  },
+  "files": {
+    "independent_failure_cases": "reports/v1/article_retrieval_rrf_bm25_medcpt_bmretriever_k60_full_dev_failures.jsonl",
+    "judged_independent": "artifacts/v1/reranking/runs/dev_judged_independent_rrf_bm25_medcpt_bmretriever_k60_full.trec",
+    "judged_origin": "artifacts/v1/reranking/runs/dev_judged_origin_rrf_bm25_medcpt_bmretriever_k60_full.trec",
+    "judged_overall": "artifacts/v1/reranking/runs/dev_judged_overall_rrf_bm25_medcpt_bmretriever_k60_full.trec",
+    "open_independent": "artifacts/v1/reranking/runs/dev_open_independent_rrf_bm25_medcpt_bmretriever_k60_full.trec",
+    "open_origin": "artifacts/v1/reranking/runs/dev_open_origin_rrf_bm25_medcpt_bmretriever_k60_full.trec",
+    "open_overall": "artifacts/v1/reranking/runs/dev_open_overall_rrf_bm25_medcpt_bmretriever_k60_full.trec"
+  },
+  "fusion": {
+    "candidate_manifest": "artifacts/v1/reranking/candidates/dev_rrf_bm25_medcpt_bmretriever_k60_full.manifest.json",
+    "candidate_parquet": "artifacts/v1/reranking/candidates/dev_rrf_bm25_medcpt_bmretriever_k60_full.parquet",
+    "full_union_ceiling": {
+      "independent": {
+        "eligible_queries": 20641,
+        "hitrate_full_union": 1.0,
+        "known_positive_recall_full_union": 0.99997578
+      },
+      "origin": {
+        "eligible_queries": 13758,
+        "hitrate_full_union": 1.0,
+        "known_positive_recall_full_union": 1.0
+      },
+      "overall": {
+        "eligible_queries": 25598,
+        "hitrate_full_union": 1.0,
+        "known_positive_recall_full_union": 0.99998047
+      }
+    },
+    "method": "rrf",
+    "rrf_k": 60,
+    "sources": [
+      {
+        "alias": "bm25",
+        "run_name": "bm25s_default",
+        "weight": 1.0
+      },
+      {
+        "alias": "medcpt",
+        "run_name": "medcpt_ivf-sq-fp16_nprobe1024",
+        "weight": 1.0
+      },
+      {
+        "alias": "bmretriever",
+        "run_name": "bmretriever_ivf-sq-fp16_nprobe1024",
+        "weight": 1.0
+      }
+    ],
+    "stats": {
+      "judged:independent": {
+        "candidate_rows": 53865,
+        "queries": 20641,
+        "source_mask_counts": {
+          "7": 53865
+        },
+        "trec_rows": 53865,
+        "union_size_max": 5,
+        "union_size_mean": 2.6096,
+        "union_size_min": 1
+      },
+      "judged:origin": {
+        "candidate_rows": 13758,
+        "queries": 13758,
+        "source_mask_counts": {
+          "7": 13758
+        },
+        "trec_rows": 13758,
+        "union_size_max": 1,
+        "union_size_mean": 1.0,
+        "union_size_min": 1
+      },
+      "judged:overall": {
+        "candidate_rows": 74077,
+        "queries": 25598,
+        "source_mask_counts": {
+          "7": 74077
+        },
+        "trec_rows": 74077,
+        "union_size_max": 5,
+        "union_size_mean": 2.8939,
+        "union_size_min": 1
+      },
+      "open:independent": {
+        "candidate_rows": 4749113,
+        "queries": 20641,
+        "source_mask_counts": {
+          "1": 1344798,
+          "2": 1183969,
+          "3": 156246,
+          "4": 1117351,
+          "5": 222864,
+          "6": 383693,
+          "7": 340192
+        },
+        "trec_rows": 2064100,
+        "union_size_max": 295,
+        "union_size_mean": 230.0815,
+        "union_size_min": 130
+      },
+      "open:origin": {
+        "candidate_rows": 3222486,
+        "queries": 13758,
+        "source_mask_counts": {
+          "1": 919426,
+          "2": 824125,
+          "3": 103135,
+          "4": 782678,
+          "5": 144582,
+          "6": 239883,
+          "7": 208657
+        },
+        "trec_rows": 1375800,
+        "union_size_max": 293,
+        "union_size_mean": 234.2263,
+        "union_size_min": 128
+      },
+      "open:overall": {
+        "candidate_rows": 5917943,
+        "queries": 25598,
+        "source_mask_counts": {
+          "1": 1678741,
+          "2": 1486775,
+          "3": 192627,
+          "4": 1406036,
+          "5": 273366,
+          "6": 465332,
+          "7": 415066
+        },
+        "trec_rows": 2559800,
+        "union_size_max": 293,
+        "union_size_mean": 231.1877,
+        "union_size_min": 128
+      }
+    }
+  },
+  "queries_evaluated": 26644,
+  "queries_in_split": 26644,
+  "queries_with_eligible_judgments": 26644,
+  "query_limit": null,
+  "retriever": {
+    "family": "hybrid_fusion"
+  },
+  "run_name": "rrf_bm25_medcpt_bmretriever_k60_full",
+  "run_source": "saved_trec",
+  "schema_version": "1.1.0",
+  "split": "dev",
+  "top_k": 100,
+  "tracks": {
+    "independent": {
+      "eligible_queries": 20641,
+      "excluded_no_candidates": 286,
+      "excluded_no_positive": 5717,
+      "judged_candidate_ranking": {
+        "mean_top1_relevance_grade": 1.29436558,
+        "mrr": 0.91380828,
+        "ndcg@10": 0.90160095,
+        "ndcg@3": 0.89045832,
+        "ndcg@5": 0.90160095,
+        "pairwise_ordering_accuracy": 0.71560675,
+        "recall@10": 1.0,
+        "recall@50": 1.0,
+        "top1_positive_rate": 0.83232402
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.92505208,
+        "hitrate@100": 1.0,
+        "known_positive_recall@10": 0.85714839,
+        "known_positive_recall@100": 0.99997578,
+        "known_positive_recall@50": 0.99221452
+      },
+      "pairwise_evaluable_queries": 18674,
+      "queries_with_eligible_judgments": 26644
+    },
+    "origin": {
+      "eligible_queries": 13758,
+      "excluded_no_candidates": 12856,
+      "excluded_no_positive": 30,
+      "judged_candidate_ranking": {
+        "mean_top1_relevance_grade": 1.96438436,
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "ndcg@3": 1.0,
+        "ndcg@5": 1.0,
+        "pairwise_ordering_accuracy": null,
+        "recall@10": 1.0,
+        "recall@50": 1.0,
+        "top1_positive_rate": 1.0
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.99992732,
+        "hitrate@100": 1.0,
+        "known_positive_recall@10": 0.99992732,
+        "known_positive_recall@100": 1.0,
+        "known_positive_recall@50": 1.0
+      },
+      "pairwise_evaluable_queries": 0,
+      "queries_with_eligible_judgments": 26644
+    },
+    "overall": {
+      "eligible_queries": 25598,
+      "excluded_no_candidates": 0,
+      "excluded_no_positive": 1046,
+      "judged_candidate_ranking": {
+        "mean_top1_relevance_grade": 1.7057192,
+        "mrr": 0.96353231,
+        "ndcg@10": 0.94422569,
+        "ndcg@3": 0.92925977,
+        "ndcg@5": 0.94422569,
+        "pairwise_ordering_accuracy": 0.8187357,
+        "recall@10": 1.0,
+        "recall@50": 1.0,
+        "top1_positive_rate": 0.92929135
+      },
+      "open_corpus_incomplete_qrels": {
+        "hitrate@10": 0.96702867,
+        "hitrate@100": 1.0,
+        "known_positive_recall@10": 0.89890942,
+        "known_positive_recall@100": 0.99998047,
+        "known_positive_recall@50": 0.99428536
+      },
+      "pairwise_evaluable_queries": 23942,
+      "queries_with_eligible_judgments": 26644
+    }
+  }
+}

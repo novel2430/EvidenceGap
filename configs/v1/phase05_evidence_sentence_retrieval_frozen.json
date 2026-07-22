@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "phase05",
+  "task": "evidence_sentence_retrieval",
+  "status": "frozen",
+  "selection_basis": "full_dev",
+  "frozen_configuration": {
+    "left_model": "bmretriever",
+    "right_model": "medcpt",
+    "left_depth": 20,
+    "right_depth": 20,
+    "fusion": "rrf",
+    "rrf_k": 10,
+    "left_weight": 1.0,
+    "right_weight": 1.0,
+    "cross_encoder": null,
+    "evaluation_top_k": 5
+  },
+  "dev": {
+    "ranking_path": "artifacts/v1/evidence_sentence_retrieval/fusion/rrf_bmr20_medcpt20_k10_full_dev/ranked_sentences.parquet",
+    "ranking_sha256": "1788e0660a6490f62ca5ca7fa232fab33ad61c060619a0d0bcea10fd57487a4c",
+    "manifest_path": "artifacts/v1/evidence_sentence_retrieval/fusion/rrf_bmr20_medcpt20_k10_full_dev/run_manifest.json",
+    "metrics_report_path": "reports/v1/evidence_sentence_retrieval_rrf_bmr20_medcpt20_k10_full_dev_dev.json",
+    "comparison_report_path": "reports/v1/evidence_sentence_rrf_k10_vs_bmretriever_full_dev.json"
+  },
+  "test": {
+    "ranking_path": "artifacts/v1/evidence_sentence_retrieval/fusion/rrf_bmr20_medcpt20_k10_full_test/ranked_sentences.parquet",
+    "ranking_sha256": "8f69d853d9ebf8c906538f828e58737b160d2cf62cb49183004fba23ae753bd0",
+    "manifest_path": "artifacts/v1/evidence_sentence_retrieval/fusion/rrf_bmr20_medcpt20_k10_full_test/run_manifest.json",
+    "metrics_report_path": "reports/v1/evidence_sentence_retrieval_rrf_bmr20_medcpt20_k10_full_test_test.json",
+    "comparison_report_path": "reports/v1/evidence_sentence_rrf_k10_vs_bmretriever_full_test.json"
+  },
+  "phase06_contract": {
+    "development_split": "dev",
+    "default_evidence_top_k": 5,
+    "preserve_original_sentence_index": true,
+    "resplit_sentences": false,
+    "deduplicate_sentences": false
+  }
+}

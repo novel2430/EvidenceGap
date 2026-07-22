@@ -1,0 +1,41 @@
+{
+  "created_at": "2026-07-21T13:16:21.298737+00:00",
+  "runs": [
+    {
+      "hitrate@100": 0.87314824,
+      "known_positive_recall@10": 0.5554212,
+      "known_positive_recall@100": 0.80262435,
+      "known_positive_recall@50": 0.73963341,
+      "mrr": 0.90444831,
+      "ndcg@5": 0.89469834,
+      "pairwise_ordering_accuracy": 0.69574096,
+      "run_name": "bm25s_default",
+      "top1_positive_rate": 0.81428431
+    },
+    {
+      "hitrate@100": 1.0,
+      "known_positive_recall@10": 0.99973429,
+      "known_positive_recall@100": 0.99975882,
+      "known_positive_recall@50": 0.99975882,
+      "mrr": 0.87172978,
+      "ndcg@5": 0.86831186,
+      "pairwise_ordering_accuracy": 0.61483951,
+      "run_name": "medcpt_ivf-sq-fp16_nprobe1024",
+      "top1_positive_rate": 0.75120181
+    },
+    {
+      "hitrate@100": 0.97365839,
+      "known_positive_recall@10": 0.76102309,
+      "known_positive_recall@100": 0.9523194,
+      "known_positive_recall@50": 0.91791098,
+      "mrr": 0.91645001,
+      "ndcg@5": 0.90445643,
+      "pairwise_ordering_accuracy": 0.72373154,
+      "run_name": "bmretriever_ivf-sq-fp16_nprobe1024",
+      "top1_positive_rate": 0.83758462
+    }
+  ],
+  "schema_version": "1.0.0",
+  "split": "test",
+  "track": "independent"
+}
