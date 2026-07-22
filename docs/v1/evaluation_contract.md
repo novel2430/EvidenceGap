@@ -152,7 +152,15 @@ Top-5 句子覆蓋的 gold aspects 比例。
 
 ### Aspect Recall@Optimal
 
-在 contract 指定的 optimal selection budget／dataset evaluation convention 下計算。實作時必須將具體 budget 與算法寫入 run parameters，不能只報名稱。
+每個 datapoint 優先使用 raw 欄位：
+
+```text
+evidence_retrieval_at_optimal_evaluation["optimal"]
+```
+
+若該預計算欄位缺失，evaluator 由 gold aspect mappings 精確求解相同定義的最小 set-cover budget，作為該 query 的 cutoff `K_i`。`K_i` 是覆蓋最多 gold aspects 所需的最少句數。Evaluator 對模型完整 ranking 取 Top-`K_i`，再計算 covered aspects／all gold aspects，最後對 eligible queries 做 macro average。
+
+此欄位只屬於 evaluation metadata，不得進入 scorer、模型輸入、分數計算或 sentence ordering。若 prediction depth 小於 `K_i`，正式 evaluator 必須 fail，不得猜測或自行改用其他 cutoff。
 
 ### Results Aspect Recall@5
 

@@ -178,18 +178,20 @@ is_origin_source = str(claim_pmid) == str(source_pmid)
 | Aspect → sentence indices | `aspect2sentence_indices` |
 | Sentence index → aspects | `sentence_index2aspects` |
 | Results-only aspect IDs | `results_aspect_list_ids` |
+| Official optimal evaluation budget | `evidence_retrieval_at_optimal_evaluation["optimal"]` when present; otherwise derive the same exact minimum set-cover budget from the gold aspect mappings |
 | Candidate sentence type | `sentence_types_in_candidate_pool` |
 | Paper ID | `paper_id` |
 | Review grouping ID | `systematic_review_id` |
 
-Raw result fields：
+Raw evaluation/result fields：
 
 ```text
+evidence_retrieval_at_optimal_evaluation
 results_evidence_retrieval_at_5_evaluation
 results_evidence_retrieval_at_optimal_evaluation
 ```
 
-屬於資料集內既有結果欄位，不作 gold input，也不進模型輸入。
+均不得進入 scorer 或模型輸入。Phase 05 canonical loader 優先從第一個欄位抽取 `optimal` 整數；若 100k raw record 缺少該欄位，則從已驗證一致的 `aspect2sentence_indices`／`sentence_index2aspects` 精確求解最小 set cover。結果保存為 evaluator-only 的 `optimal_sentence_budget`，並以 `optimal_sentence_budget_source` 標記 `raw` 或 `derived`；results evaluation 欄位不進 canonical model artifact。
 
 ## 6.2 EvidenceQueryRecord
 
@@ -214,6 +216,8 @@ results_evidence_retrieval_at_optimal_evaluation
     "13": ["train_0_aspect_0"]
   },
   "results_aspect_ids": null,
+  "optimal_sentence_budget": 2,
+  "pool_fingerprint": "<sha256 of paper_id and exact ordered sentence list>",
   "contract_version": "1.0.0",
   "raw_locator": {
     "path": "data/raw/v1/evidencebench_100k/evidencebench_100k_train_set.json",
