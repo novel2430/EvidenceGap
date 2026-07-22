@@ -23,6 +23,7 @@ after auditing the actual label and text structure of the three V1 datasets.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import random
@@ -44,6 +45,18 @@ MODELS = {
     "medcpt-cross": "ncbi/MedCPT-Cross-Encoder",
     "bmretriever-410m": "BMRetriever/BMRetriever-410M",
     "verifier-deberta-v3-base": "cross-encoder/nli-deberta-v3-base",
+}
+
+# MedCPT Cross Encoder's main branch currently exposes only pytorch_model.bin.
+# Transformers refuses that pickle-based format with torch<2.6 after
+# CVE-2025-32434. Hugging Face's verified conversion commit provides an
+# equivalent safetensors file without requiring a PyTorch/CUDA upgrade.
+SAFE_WEIGHT_OVERRIDES = {
+    "medcpt-cross": {
+        "revision": "75e855e5aaeda1e16da04a894207072d4b0db66a",
+        "filename": "model.safetensors",
+        "sha256": "b27e15c8bae944cb3cfd752e09669e447bd6282f787115ee485b484ef4657eb9",
+    }
 }
 
 SMALL_MODEL_FILES = {
@@ -173,9 +186,22 @@ def resolve_model(
         if item.get("rfilename")
     ]
     files = select_files(siblings)
+    if alias in SAFE_WEIGHT_OVERRIDES:
+        files = [name for name in files if not is_model_weight(name)]
     if not files:
         raise RuntimeError(f"No usable model files found for {repo_id}")
     return ModelInfo(alias, repo_id, revision, tuple(files))
+
+
+def is_model_weight(name: str) -> bool:
+    basename = Path(name).name
+    return (
+        name.endswith(".safetensors")
+        or name.endswith(".safetensors.index.json")
+        or basename == "pytorch_model.bin"
+        or basename.startswith("pytorch_model-")
+        or basename == "pytorch_model.bin.index.json"
+    )
 
 
 def select_files(siblings: list[str]) -> list[str]:
@@ -364,6 +390,22 @@ def download_file(
     }
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(8 * 1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_sha256(path: Path, expected: str) -> None:
+    actual = sha256_file(path)
+    if actual != expected:
+        raise RuntimeError(
+            f"SHA-256 mismatch for {path}: expected {expected}, got {actual}"
+        )
+
+
 def validate_model_dir(path: Path) -> None:
     files = [item for item in path.rglob("*") if item.is_file()]
     names = {item.name for item in files}
@@ -459,6 +501,23 @@ def main() -> None:
                 )
             )
 
+        safe_weight = SAFE_WEIGHT_OVERRIDES.get(alias)
+        if safe_weight is not None:
+            safe_target = target_dir / safe_weight["filename"]
+            result = download_file(
+                session,
+                repo_id=info.repo_id,
+                revision=safe_weight["revision"],
+                filename=safe_weight["filename"],
+                target=safe_target,
+                timeout=args.timeout,
+                attempts=args.attempts,
+            )
+            validate_sha256(safe_target, safe_weight["sha256"])
+            result["revision"] = safe_weight["revision"]
+            result["sha256"] = safe_weight["sha256"]
+            downloaded.append(result)
+
         validate_model_dir(target_dir)
         total = sum(
             item.stat().st_size
@@ -471,6 +530,7 @@ def main() -> None:
             "target": str(target_dir),
             "bytes": total,
             "files": downloaded,
+            "safe_weight_override": safe_weight,
             "status": "ok",
         }
         print(f"[complete] {alias}: {human_bytes(total)}")
