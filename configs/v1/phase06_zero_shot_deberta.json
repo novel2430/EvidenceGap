@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "phase06",
+  "task": "stance_verification",
+  "status": "baseline",
+  "model": {
+    "alias": "verifier-deberta-v3-base",
+    "repository": "cross-encoder/nli-deberta-v3-base",
+    "local_path": "models/v1/verifier-deberta-v3-base",
+    "input_order": {
+      "premise": "evidence_text",
+      "hypothesis": "claim_text"
+    },
+    "nli_to_stance": {
+      "entailment": "support",
+      "contradiction": "refute",
+      "neutral": "insufficient"
+    }
+  },
+  "inference": {
+    "max_length": 512,
+    "batch_size": 16,
+    "amp": "fp16"
+  },
+  "development_input": {
+    "phase05_split": "dev",
+    "evidence_top_k": 5,
+    "test_requires_explicit_allow_flag": true
+  },
+  "notes": [
+    "This is a zero-shot NLI baseline, not a calibrated medical verifier.",
+    "Phase 05 relevance scores are preserved as provenance and are never interpreted as stance probabilities.",
+    "EvidenceBench inputs do not contain stance gold labels; HealthFC provides external expert bundle-level evaluation."
+  ]
+}

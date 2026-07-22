@@ -7,6 +7,7 @@ Models:
 - ncbi/MedCPT-Article-Encoder
 - ncbi/MedCPT-Cross-Encoder
 - BMRetriever/BMRetriever-410M
+- cross-encoder/nli-deberta-v3-base
 
 The downloader bypasses Hugging Face snapshot/Xet transfers:
 - resolves the current repository commit through the public model API;
@@ -16,8 +17,8 @@ The downloader bypasses Hugging Face snapshot/Xet transfers:
 - reuses validated completed files;
 - writes models/v1/download_manifest.json.
 
-No verifier model is included yet. The verifier is intentionally selected only
-after auditing the actual label and text structure of the three V1 datasets.
+The verifier alias is included for Phase 06 zero-shot NLI. Runtime code still
+validates the local config label mapping instead of assuming class indices.
 """
 
 from __future__ import annotations
