@@ -12,7 +12,10 @@ from evidencegap.stance.contracts import (
     StancePrediction,
 )
 from evidencegap.stance.evaluation import evaluate_stance_predictions
-from evidencegap.stance.llm_judge import run_llm_stance_judge
+from evidencegap.stance.llm_judge import (
+    export_llm_stance_cache,
+    run_llm_stance_judge,
+)
 from evidencegap.stance.inputs import (
     prepare_healthfc_stance_inputs,
     prepare_phase05_stance_inputs,
@@ -26,6 +29,7 @@ __all__ = [
     "StanceLabel",
     "StancePrediction",
     "evaluate_stance_predictions",
+    "export_llm_stance_cache",
     "iter_inputs",
     "iter_prediction_rows",
     "prepare_healthfc_stance_inputs",

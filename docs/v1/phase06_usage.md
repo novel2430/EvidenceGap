@@ -332,8 +332,10 @@ Runner 会拒绝并重试以下回覆：
 
 - 缺少或重复 `input_id`；
 - 数量或顺序与请求不一致；
-- 非法 stance 标签；`evidence_type` 同义词会正规化，未知值会降级为 `mixed_or_other`；
-- 概率不在 `[0, 1]`、不接近总和 1，或 label 不是 argmax；
+- `evidence_type` 同义词会正规化，未知值会降级为 `mixed_or_other`；
+- label 为空或非法但 probabilities 完整时会本地恢复；
+- label 与 probability argmax 不一致时会本地 reconcile；
+- 概率缺失、不在 `[0, 1]` 或不接近总和 1；
 - rationale 为空；
 - truncated、empty 或 non-JSON response。
 
@@ -373,20 +375,187 @@ retry_count
 
 该参数只适用于 `--provider deepseek`。
 
-### 8.7 跑 Phase 05 Dev evidence
+### 8.7 跑 Phase 05 Dev evidence（06.6）
+
+Phase 05 是句子级输入。正式 06.6 输入默认加入目标句前后各一条原始 canonical sentence，仅用于解析指代和比较关系；目标 `sentence_text` 与原始 `sentence_index` 不变。
+
+```bash
+python scripts/run_v1_phase06.py prepare-phase05 \
+  --root . \
+  --split dev \
+  --top-k 5 \
+  --context-window 1 \
+  --run-name phase05_rrf_top5_ctx1_dev
+```
+
+输出：
+
+```text
+artifacts/v1/stance_verification/inputs/phase05_rrf_top5_ctx1_dev/
+├── stance_inputs.parquet
+└── run_manifest.json
+```
+
+#### 不扣费的全量执行规划
+
+`--dry-run` 不读取 API key、不调用 provider，也不创建 prediction artifact：
 
 ```bash
 python scripts/run_v1_phase06.py llm-judge \
   --root . \
-  --input-path artifacts/v1/stance_verification/inputs/phase05_rrf_top5_dev/stance_inputs.parquet \
+  --input-path artifacts/v1/stance_verification/inputs/phase05_rrf_top5_ctx1_dev/stance_inputs.parquet \
   --provider deepseek \
-  --limit 100 \
+  --model deepseek-v4-pro \
   --request-batch-size 5 \
-  --run-name deepseek_phase05_top5_dev_smoke100
+  --dry-run
 ```
 
-EvidenceBench 没有 stance gold，所以该 run 只输出预测分布、解释与 evidence type，不报告 Macro-F1。
+规划会报告：
 
-### LLM label/probability reconciliation
+```text
+selected queries / rows
+estimated API requests
+rows-per-query distribution
+rank gaps / duplicate sentence indices
+claim / evidence / context character counts
+selection checksum
+```
 
-The explicit `label` is treated as the primary stance decision. If an LLM returns valid probabilities whose argmax disagrees with that label, the runner reconciles the probabilities locally, records the event in `probability_reconciled_rows` and `probability_reconciliation_counts`, and does not retry the API request. This prevents auxiliary probability inconsistencies from consuming repeated API calls.
+#### Query 级 Smoke-100
+
+不要再用 `--limit 100`：它表示 100 行，可能切断某个 query 的完整 Top-5。06.6 应使用确定性 query 抽样：
+
+```bash
+python scripts/run_v1_phase06.py llm-judge \
+  --root . \
+  --input-path artifacts/v1/stance_verification/inputs/phase05_rrf_top5_ctx1_dev/stance_inputs.parquet \
+  --provider deepseek \
+  --model deepseek-v4-pro \
+  --query-sample-size 100 \
+  --query-sample-seed 20260722 \
+  --request-batch-size 5 \
+  --max-retries 1 \
+  --run-name deepseek_v4_pro_phase05_top5_ctx1_dev_smoke100
+```
+
+该命令会保留抽中 query 的完整 Top-5，约产生 500 条判断和 100 个 API requests。先检查 stance 分布、英文 rationale、`evidence_type` 与代表案例；这不是新增人工标注。
+
+#### Full Dev
+
+Smoke 输出正常后运行全部 Dev：
+
+```bash
+python scripts/run_v1_phase06.py llm-judge \
+  --root . \
+  --input-path artifacts/v1/stance_verification/inputs/phase05_rrf_top5_ctx1_dev/stance_inputs.parquet \
+  --provider deepseek \
+  --model deepseek-v4-pro \
+  --request-batch-size 5 \
+  --max-retries 1 \
+  --run-name deepseek_v4_pro_phase05_top5_ctx1_dev
+```
+
+相同参数重跑会复用成功 batch cache。EvidenceBench 没有 stance gold，因此该 run 只输出预测分布、解释、evidence type、请求费用与完整 artifact validation，不报告 Macro-F1。冻结配置记录在：
+
+```text
+configs/v1/phase06_stance_verification_frozen.json
+```
+
+### LLM 输出容错与费用保护
+
+- `evidence_type` 同义词会正规化，未知值降级为 `mixed_or_other`。
+- label 与有效 probabilities 的 argmax 不一致时，以明确 label 为主并本地调整概率。
+- label 为空或不是三类之一，但三类 probabilities 完整有效时，使用 probability argmax 恢复 label。
+- 上述本地修复都会进入 report 计数，不会重新请求 API。
+- 缺少完整概率、缺少 rationale、ID/数量错误或无法解析 JSON 仍会触发 retry。
+
+### 8.8 从中断的 Full Dev cache 导出 partial artifact
+
+如果 Full Dev 在完成前中止，不需要继续请求 API，也不需要删除 cache。使用与原运行完全相同的 input、provider、model、batch size、max tokens、base URL 与 thinking 设置执行：
+
+```bash
+python scripts/run_v1_phase06.py export-cache \
+  --root . \
+  --input-path artifacts/v1/stance_verification/inputs/phase05_rrf_top5_ctx1_dev/stance_inputs.parquet \
+  --provider deepseek \
+  --model deepseek-v4-pro \
+  --request-batch-size 5 \
+  --run-name deepseek_v4_pro_phase05_top5_ctx1_dev_partial2520
+```
+
+该命令：
+
+- 不读取 API key；
+- 不调用 DeepSeek 或 Anthropic；
+- 按当前 Prompt 与请求参数重新计算 exact request fingerprint；
+- 只读取真正匹配当前输入的 cache；
+- 只导出完整 query group，排除不完整 Top-5；
+- 生成正式 Parquet、manifest、JSON report 和 Markdown summary。
+
+输出：
+
+```text
+artifacts/v1/stance_verification/llm_judge/<run_name>/
+├── stance_predictions.parquet
+└── run_manifest.json
+
+reports/v1/stance_llm_<run_name>.json
+reports/v1/stance_llm_<run_name>.md
+```
+
+查看总体覆盖率与 stance/evidence type 分布：
+
+```bash
+cat reports/v1/stance_llm_deepseek_v4_pro_phase05_top5_ctx1_dev_partial2520.md
+```
+
+验证导出的 prediction artifact：
+
+```bash
+python scripts/run_v1_phase06.py validate \
+  --root . \
+  --prediction-path artifacts/v1/stance_verification/llm_judge/deepseek_v4_pro_phase05_top5_ctx1_dev_partial2520/stance_predictions.parquet \
+  --run-name deepseek_v4_pro_phase05_top5_ctx1_dev_partial2520
+```
+
+查看实际预测案例：
+
+```bash
+python - <<'PY'
+import pyarrow.parquet as pq
+
+path = (
+    "artifacts/v1/stance_verification/llm_judge/"
+    "deepseek_v4_pro_phase05_top5_ctx1_dev_partial2520/"
+    "stance_predictions.parquet"
+)
+rows = pq.read_table(
+    path,
+    columns=[
+        "query_id",
+        "claim_text",
+        "paper_id",
+        "sentence_index",
+        "evidence_rank",
+        "evidence_text",
+        "predicted_label",
+        "confidence",
+        "evidence_type",
+        "rationale",
+    ],
+).slice(0, 20).to_pylist()
+
+for row in rows:
+    print("=" * 100)
+    print(f"Query: {row['query_id']}  Rank: {row['evidence_rank']}")
+    print("Claim:", row["claim_text"])
+    print("Evidence:", row["evidence_text"])
+    print(
+        "Prediction:",
+        row["predicted_label"],
+        f"confidence={row['confidence']:.3f}",
+        f"type={row['evidence_type']}",
+    )
+    print("Rationale:", row["rationale"])
+PY
+```

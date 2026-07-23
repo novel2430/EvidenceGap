@@ -21,6 +21,7 @@ from evidencegap.stance.llm_judge import (
     _call_anthropic,
     _call_deepseek,
     _call_with_retries,
+    _model_identity,
     _user_prompt,
     _validate_result_payload,
 )
@@ -71,6 +72,16 @@ class LlmJudgeContractTests(unittest.TestCase):
     def test_prompt_version_is_v2(self) -> None:
         self.assertEqual(PROMPT_VERSION, "phase06_llm_stance_v2")
 
+    def test_model_identity_does_not_recurse(self) -> None:
+        schema_hash, prompt_hash, model_fingerprint = _model_identity(
+            provider="deepseek",
+            model="deepseek-v4-pro",
+            base_url="https://api.deepseek.com/",
+        )
+        self.assertEqual(len(schema_hash), 64)
+        self.assertEqual(len(prompt_hash), 64)
+        self.assertEqual(len(model_fingerprint), 64)
+
     def test_system_prompt_requires_exact_evidence_type_choice(self) -> None:
         self.assertIn("Choose exactly one of the following seven values", SYSTEM_PROMPT)
         self.assertIn("Do not invent, rename, combine, or pluralize categories", SYSTEM_PROMPT)
@@ -120,6 +131,22 @@ class LlmJudgeContractTests(unittest.TestCase):
         self.assertTrue(result[0]["probability_reconciled"])
         self.assertEqual(result[0]["probability_original_argmax"], "support")
         self.assertAlmostEqual(sum(probabilities.values()), 1.0)
+
+    def test_blank_label_is_recovered_from_probability_argmax(self) -> None:
+        payload = fixture_output()
+        payload["results"][0]["label"] = ""  # type: ignore[index]
+        result = _validate_result_payload(payload, [fixture_input()])
+        self.assertEqual(result[0]["label"], "support")
+        self.assertTrue(result[0]["label_recovered"])
+        self.assertEqual(result[0]["label_original_value"], "blank")
+
+    def test_unknown_label_is_recovered_from_probability_argmax(self) -> None:
+        payload = fixture_output()
+        payload["results"][0]["label"] = "partially_support"  # type: ignore[index]
+        result = _validate_result_payload(payload, [fixture_input()])
+        self.assertEqual(result[0]["label"], "support")
+        self.assertTrue(result[0]["label_recovered"])
+        self.assertEqual(result[0]["label_original_value"], "partially_support")
 
     def test_reconciled_cache_metadata_is_preserved(self) -> None:
         payload = fixture_output()

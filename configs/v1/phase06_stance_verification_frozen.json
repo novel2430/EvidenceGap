@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "phase06",
+  "task": "stance_verification",
+  "status": "frozen_for_phase06_dev",
+  "selection_basis": "healthfc_expert_eval",
+  "prompt_version": "phase06_llm_stance_v2",
+  "primary": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "healthfc_accuracy": 0.76,
+    "healthfc_macro_f1": 0.7506461006461006,
+    "healthfc_balanced_accuracy": 0.7898547074565613
+  },
+  "fast_mode": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "healthfc_accuracy": 0.744,
+    "healthfc_macro_f1": 0.7392024744435578,
+    "healthfc_balanced_accuracy": 0.7819683698866341
+  },
+  "external_comparison": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "thinking": "disabled",
+    "healthfc_accuracy": 0.704,
+    "healthfc_macro_f1": 0.7086985322049446,
+    "healthfc_balanced_accuracy": 0.7642723591508087
+  },
+  "traditional_baseline": {
+    "model": "cross-encoder/nli-deberta-v3-base",
+    "healthfc_accuracy": 0.49866666666666665,
+    "healthfc_macro_f1": 0.26406451879644843,
+    "healthfc_balanced_accuracy": 0.31070190139581333
+  },
+  "phase05_dev": {
+    "split": "dev",
+    "top_k": 5,
+    "context_window": 1,
+    "input_run_name": "phase05_rrf_top5_ctx1_dev",
+    "judge_run_name": "deepseek_v4_pro_phase05_top5_ctx1_dev",
+    "request_batch_size": 5,
+    "max_retries": 1,
+    "query_sample_seed": 20260722,
+    "test_artifact_allowed": false
+  },
+  "notes": [
+    "HealthFC evaluates expert gold evidence bundles, not Phase 05 sentence-level accuracy.",
+    "LLM probabilities are self-reported and are not statistically calibrated.",
+    "Phase 05 Dev is used for development; Phase 05 Test remains isolated until final evaluation."
+  ]
+}

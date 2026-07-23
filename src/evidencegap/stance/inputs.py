@@ -6,7 +6,7 @@ import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterator, Mapping, Sequence
 
 from evidencegap.common import (
     EvidenceGapError,
@@ -97,6 +97,33 @@ def _phase05_defaults(root: Path, split: str) -> tuple[Path, Path]:
     return canonical_dir, ranking_path
 
 
+def _adjacent_context(
+    sentences: Sequence[str],
+    *,
+    sentence_index: int,
+    context_window: int,
+) -> tuple[str | None, str | None, list[int], list[int]]:
+    """Return exact neighboring canonical sentences without altering the target."""
+
+    if context_window < 0:
+        raise EvidenceGapError("context_window cannot be negative")
+    if sentence_index < 0 or sentence_index >= len(sentences):
+        raise EvidenceGapError(f"sentence_index out of range: {sentence_index}")
+    if context_window == 0:
+        return None, None, [], []
+    before_indices = list(
+        range(max(0, sentence_index - context_window), sentence_index)
+    )
+    after_indices = list(
+        range(
+            sentence_index + 1,
+            min(len(sentences), sentence_index + context_window + 1),
+        )
+    )
+    before = "\n".join(sentences[index] for index in before_indices) or None
+    after = "\n".join(sentences[index] for index in after_indices) or None
+    return before, after, before_indices, after_indices
+
 def prepare_phase05_stance_inputs(
     root: Path,
     *,
@@ -104,6 +131,7 @@ def prepare_phase05_stance_inputs(
     canonical_dir: Path | None = None,
     ranking_path: Path | None = None,
     top_k: int = 5,
+    context_window: int = 1,
     run_name: str | None = None,
     artifact_root: Path | None = None,
     allow_test: bool = False,
@@ -119,6 +147,8 @@ def prepare_phase05_stance_inputs(
         )
     if top_k <= 0:
         raise EvidenceGapError("top_k must be positive")
+    if context_window < 0:
+        raise EvidenceGapError("context_window cannot be negative")
     if canonical_dir is None or ranking_path is None:
         default_canonical, default_ranking = _phase05_defaults(root, split)
         canonical_dir = canonical_dir or default_canonical
@@ -151,7 +181,10 @@ def prepare_phase05_stance_inputs(
     if not source_run_name:
         first_rows = next(iter(rows_by_query.values()), [])
         source_run_name = str(first_rows[0]["run_name"]) if first_rows else "phase05"
-    name = _safe_name(run_name or f"phase05_{source_run_name}_{split}_top{top_k}")
+    name = _safe_name(
+        run_name
+        or f"phase05_{source_run_name}_{split}_top{top_k}_ctx{context_window}"
+    )
     base = artifact_root.resolve() if artifact_root else root / DEFAULT_ARTIFACT_ROOT / "inputs"
     target = base / name
 
@@ -204,6 +237,16 @@ def prepare_phase05_stance_inputs(
                 score_value = row.get("final_score")
                 if score_value is None:
                     score_value = row.get("retrieval_score")
+                (
+                    context_before,
+                    context_after,
+                    context_before_indices,
+                    context_after_indices,
+                ) = _adjacent_context(
+                    query.candidate_sentences,
+                    sentence_index=index,
+                    context_window=context_window,
+                )
                 expected_rows += 1
                 label_counts["unlabeled"] += 1
                 yield StanceInput(
@@ -219,6 +262,8 @@ def prepare_phase05_stance_inputs(
                     evidence_rank=rank,
                     evidence_text=query.candidate_sentences[index],
                     evidence_unit="sentence",
+                    context_before=context_before,
+                    context_after=context_after,
                     retrieval_model=str(row["retrieval_model"]),
                     retrieval_score=None if score_value is None else float(score_value),
                     cross_encoder_score=(
@@ -236,6 +281,9 @@ def prepare_phase05_stance_inputs(
                         "paper_id": query.paper_id,
                         "sentence_index": index,
                         "phase05_final_rank": rank,
+                        "context_window": context_window,
+                        "context_before_indices": context_before_indices,
+                        "context_after_indices": context_after_indices,
                     },
                 )
 
@@ -252,7 +300,11 @@ def prepare_phase05_stance_inputs(
             "run_name": name,
             "run_type": "phase05_ranked_sentence_stance_inputs",
             "split": split,
-            "parameters": {"top_k": top_k, "allow_test": allow_test},
+            "parameters": {
+                "top_k": top_k,
+                "context_window": context_window,
+                "allow_test": allow_test,
+            },
             "canonical_dir": relative_path(root, canonical_dir),
             "canonical_sha256": canonical_manifest.get("canonical_sha256"),
             "source_ranking_path": relative_path(root, ranking_path),

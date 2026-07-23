@@ -14,6 +14,7 @@ if str(SRC) not in sys.path:
 from evidencegap.common import EvidenceGapError
 from evidencegap.stance import (
     evaluate_stance_predictions,
+    export_llm_stance_cache,
     prepare_healthfc_stance_inputs,
     prepare_phase05_stance_inputs,
     run_deberta_zero_shot,
@@ -42,6 +43,12 @@ def build_parser() -> argparse.ArgumentParser:
     phase05.add_argument("--canonical-dir", type=Path)
     phase05.add_argument("--ranking-path", type=Path)
     phase05.add_argument("--top-k", type=int, default=5)
+    phase05.add_argument(
+        "--context-window",
+        type=int,
+        default=1,
+        help="Exact neighboring canonical sentences on each side; 0 disables context",
+    )
     phase05.add_argument("--run-name")
     phase05.add_argument("--artifact-root", type=Path)
     phase05.add_argument(
@@ -94,8 +101,43 @@ def build_parser() -> argparse.ArgumentParser:
     llm_judge.add_argument("--max-tokens", type=int, default=4096)
     llm_judge.add_argument("--timeout-seconds", type=float, default=180.0)
     llm_judge.add_argument("--max-retries", type=int, default=4)
-    llm_judge.add_argument("--offset", type=int, default=0)
-    llm_judge.add_argument("--limit", type=int)
+    llm_judge.add_argument(
+        "--offset",
+        type=int,
+        default=0,
+        help="Row-level offset; retained for bundle evaluations",
+    )
+    llm_judge.add_argument(
+        "--limit",
+        type=int,
+        help="Row-level limit; for Phase 05 use query-level sampling instead",
+    )
+    llm_judge.add_argument(
+        "--query-offset",
+        type=int,
+        default=0,
+        help="Select complete query groups starting from this query offset",
+    )
+    llm_judge.add_argument(
+        "--query-limit",
+        type=int,
+        help="Select this many complete query groups",
+    )
+    llm_judge.add_argument(
+        "--query-sample-size",
+        type=int,
+        help="Deterministically sample complete query groups for a Phase 05 smoke run",
+    )
+    llm_judge.add_argument(
+        "--query-sample-seed",
+        type=int,
+        default=20260722,
+    )
+    llm_judge.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate selection and print request estimates without requiring an API key",
+    )
     llm_judge.add_argument(
         "--thinking",
         action="store_true",
@@ -105,6 +147,30 @@ def build_parser() -> argparse.ArgumentParser:
     llm_judge.add_argument("--artifact-root", type=Path)
     llm_judge.add_argument("--report-dir", type=Path)
     llm_judge.add_argument("--force", action="store_true")
+
+    export_cache = sub.add_parser(
+        "export-cache",
+        help="Export completed exact-match LLM cache batches without API calls",
+    )
+    _root(export_cache)
+    export_cache.add_argument("--input-path", type=Path, required=True)
+    export_cache.add_argument(
+        "--provider", choices=("deepseek", "anthropic"), required=True
+    )
+    export_cache.add_argument("--model")
+    export_cache.add_argument("--run-name")
+    export_cache.add_argument("--base-url")
+    export_cache.add_argument("--request-batch-size", type=int, default=8)
+    export_cache.add_argument("--max-tokens", type=int, default=4096)
+    export_cache.add_argument(
+        "--thinking",
+        action="store_true",
+        help="Match a DeepSeek cache created with thinking enabled",
+    )
+    export_cache.add_argument("--cache-dir", type=Path)
+    export_cache.add_argument("--artifact-root", type=Path)
+    export_cache.add_argument("--report-dir", type=Path)
+    export_cache.add_argument("--force", action="store_true")
 
     evaluate = sub.add_parser(
         "evaluate",
@@ -134,6 +200,7 @@ def main() -> None:
             canonical_dir=args.canonical_dir,
             ranking_path=args.ranking_path,
             top_k=args.top_k,
+            context_window=args.context_window,
             run_name=args.run_name,
             artifact_root=args.artifact_root,
             allow_test=args.allow_test,
@@ -177,6 +244,27 @@ def main() -> None:
             max_retries=args.max_retries,
             offset=args.offset,
             limit=args.limit,
+            query_offset=args.query_offset,
+            query_limit=args.query_limit,
+            query_sample_size=args.query_sample_size,
+            query_sample_seed=args.query_sample_seed,
+            dry_run=args.dry_run,
+            thinking=args.thinking,
+            cache_dir=args.cache_dir,
+            artifact_root=args.artifact_root,
+            report_dir=args.report_dir,
+            force=args.force,
+        )
+    elif args.command == "export-cache":
+        result = export_llm_stance_cache(
+            root,
+            input_path=args.input_path,
+            provider=args.provider,
+            model=args.model,
+            run_name=args.run_name,
+            base_url=args.base_url,
+            request_batch_size=args.request_batch_size,
+            max_tokens=args.max_tokens,
             thinking=args.thinking,
             cache_dir=args.cache_dir,
             artifact_root=args.artifact_root,
