@@ -14,6 +14,7 @@ if str(SRC) not in sys.path:
 from evidencegap.common import EvidenceGapError
 from evidencegap.stance import (
     evaluate_stance_predictions,
+    export_graph_ready_stance,
     export_llm_stance_cache,
     prepare_healthfc_stance_inputs,
     prepare_phase05_stance_inputs,
@@ -172,6 +173,17 @@ def build_parser() -> argparse.ArgumentParser:
     export_cache.add_argument("--report-dir", type=Path)
     export_cache.add_argument("--force", action="store_true")
 
+    graph_export = sub.add_parser(
+        "export-graph",
+        help="Aggregate sentence stances into graph-ready query/paper artifacts",
+    )
+    _root(graph_export)
+    graph_export.add_argument("--prediction-path", type=Path, required=True)
+    graph_export.add_argument("--run-name")
+    graph_export.add_argument("--artifact-root", type=Path)
+    graph_export.add_argument("--report-dir", type=Path)
+    graph_export.add_argument("--force", action="store_true")
+
     evaluate = sub.add_parser(
         "evaluate",
         help="Evaluate a stance prediction artifact containing gold labels",
@@ -267,6 +279,15 @@ def main() -> None:
             max_tokens=args.max_tokens,
             thinking=args.thinking,
             cache_dir=args.cache_dir,
+            artifact_root=args.artifact_root,
+            report_dir=args.report_dir,
+            force=args.force,
+        )
+    elif args.command == "export-graph":
+        result = export_graph_ready_stance(
+            root,
+            prediction_path=args.prediction_path,
+            run_name=args.run_name,
             artifact_root=args.artifact_root,
             report_dir=args.report_dir,
             force=args.force,

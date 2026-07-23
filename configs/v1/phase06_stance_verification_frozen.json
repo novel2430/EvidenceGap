@@ -38,15 +38,31 @@
     "top_k": 5,
     "context_window": 1,
     "input_run_name": "phase05_rrf_top5_ctx1_dev",
-    "judge_run_name": "deepseek_v4_pro_phase05_top5_ctx1_dev",
+    "judge_run_name": "deepseek_v4_pro_phase05_top5_ctx1_dev_partial_cache",
     "request_batch_size": 5,
     "max_retries": 1,
     "query_sample_seed": 20260722,
-    "test_artifact_allowed": false
+    "test_artifact_allowed": false,
+    "prediction_artifact_path": "artifacts/v1/stance_verification/llm_judge/deepseek_v4_pro_phase05_top5_ctx1_dev_partial_cache/stance_predictions.parquet",
+    "prediction_artifact_sha256": "8ebf654713721a5f8b6c9c38b75266e6f4e666a418ef2b4bf36f9564aee931b9",
+    "source_queries": 4373,
+    "exported_queries": 2520,
+    "source_rows": 21865,
+    "exported_rows": 12600,
+    "coverage_fraction": 0.5762634347130117,
+    "partial": true,
+    "graph_export": {
+      "contract_id": "phase06.graph-ready.v1.1",
+      "run_name": "deepseek_v4_pro_phase05_top5_ctx1_dev_partial_graph",
+      "artifact_root": "artifacts/v1/stance_verification/graph_ready",
+      "final_medical_verdict": false
+    }
   },
   "notes": [
     "HealthFC evaluates expert gold evidence bundles, not Phase 05 sentence-level accuracy.",
     "LLM probabilities are self-reported and are not statistically calibrated.",
-    "Phase 05 Dev is used for development; Phase 05 Test remains isolated until final evaluation."
+    "Phase 05 Dev is used for development; Phase 05 Test remains isolated until final evaluation.",
+    "Phase 06.6 Dev execution was intentionally frozen as a complete-query partial artifact: 2,520/4,373 queries and 12,600/21,865 Top-5 sentence judgments.",
+    "Phase 06.7 exports query/paper directional evidence patterns, directional mass share, and graph-ready nodes/edges; it does not create the final medical Verdict."
   ]
 }
