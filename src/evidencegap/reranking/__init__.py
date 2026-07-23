@@ -1,4 +1,7 @@
-from evidencegap.reranking.cross_encoder import run_cross_encoder_reranking
+from evidencegap.reranking.cross_encoder import (
+    run_cross_encoder_reranking,
+    score_runtime_article_pairs,
+)
 from evidencegap.reranking.fusion import (
     SourceRun,
     parse_source_run,
@@ -11,5 +14,6 @@ __all__ = [
     "parse_source_run",
     "parse_weight",
     "run_cross_encoder_reranking",
+    "score_runtime_article_pairs",
     "run_fusion",
 ]

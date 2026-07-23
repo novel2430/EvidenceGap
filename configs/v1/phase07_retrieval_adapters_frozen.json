@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "phase07.retrieval-adapters.v1",
+  "phase": "phase07.2",
+  "status": "frozen",
+  "article_retrieval": {
+    "sources": [
+      "bm25",
+      "medcpt",
+      "bmretriever"
+    ],
+    "source_depth": 100,
+    "dense_nprobe": 1024,
+    "fusion": "equal_weight_rrf",
+    "rrf_k": 60,
+    "candidate_depth": 100,
+    "reranker": "medcpt_cross_encoder",
+    "reranker_max_length": 512,
+    "final_article_top_k": 10
+  },
+  "sentence_materialization": {
+    "contract_id": "phase07.runtime-sentence.v1",
+    "splitter": "stanza_genia",
+    "title_policy": "one_separate_runtime_sentence_when_present",
+    "body_policy": "stanza_genia_sentence_segmentation"
+  },
+  "sentence_retrieval": {
+    "sources": [
+      "bmretriever",
+      "medcpt"
+    ],
+    "pooling": "per_article_independent",
+    "source_depth_per_article": 20,
+    "fusion": "equal_weight_rrf",
+    "rrf_k": 10,
+    "evidence_top_k_per_article": 5,
+    "cross_encoder": null,
+    "candidate_eligibility": {
+      "policy_id": "phase07.evidence-sentence-eligibility.v1",
+      "exclude_sentence_types": [
+        "title"
+      ],
+      "exclude_unterminated_structured_sections": true,
+      "plain_abstract_policy": "no_fragment_heuristic"
+    }
+  },
+  "execution_defaults": {
+    "device": "cuda:0",
+    "amp": "fp16",
+    "cross_encoder_batch_size": 16,
+    "stanza_batch_size": 32,
+    "medcpt_sentence_batch_size": 64,
+    "bmretriever_sentence_batch_size": 8
+  },
+  "output_contract": {
+    "article_candidates": "fixed RRF Top-100 reranked by MedCPT cross encoder",
+    "top_articles": "final Top-10 with complete Phase 04 provenance",
+    "runtime_sentences": "stable Stanza sentence identities and offsets",
+    "sentence_rankings": "MedCPT and BMRetriever Top-20 within each article",
+    "evidence_candidates": "equal-weight RRF Top-5 within each article"
+  }
+}

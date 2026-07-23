@@ -130,6 +130,17 @@ class DenseEncoder:
         bundle = self._article_bundle if article else self._query_bundle
         if bundle is not None:
             return bundle
+        # BMRetriever uses the same checkpoint for query and passage encoding.
+        # Reuse one in-memory model copy while retaining the two input formats;
+        # otherwise a single 11 GB GPU unnecessarily holds the 410M model twice.
+        other_bundle = self._query_bundle if article else self._article_bundle
+        other_model_dir = self.spec.query_model if article else self.spec.article_model
+        if other_bundle is not None and model_dir.resolve() == other_model_dir.resolve():
+            if article:
+                self._article_bundle = other_bundle
+            else:
+                self._query_bundle = other_bundle
+            return other_bundle
         tokenizer = self.AutoTokenizer.from_pretrained(
             model_dir,
             local_files_only=True,
@@ -148,6 +159,9 @@ class DenseEncoder:
             self._article_bundle = bundle
         else:
             self._query_bundle = bundle
+        if self.spec.query_model.resolve() == self.spec.article_model.resolve():
+            self._query_bundle = bundle
+            self._article_bundle = bundle
         return bundle
 
     def _autocast(self):

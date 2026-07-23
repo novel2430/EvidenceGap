@@ -1317,3 +1317,123 @@ def run_cross_encoder_reranking(
     print(f"Cross-encoder manifest: {reranked_manifest_path}")
     print(f"Cross-encoder report: {report_path}")
     return report
+
+
+def score_runtime_article_pairs(
+    root: Path,
+    *,
+    claim_text: str,
+    articles: Sequence[Mapping[str, Any]],
+    model_dir: Path | None = None,
+    device: str = "cuda:0",
+    batch_size: int = 16,
+    max_length: int = 512,
+    amp: str = "fp16",
+) -> dict[str, Any]:
+    """Score arbitrary runtime claim/article pairs with the frozen Phase 04 model.
+
+    This dependency-light adapter deliberately returns raw single-logit scores and
+    leaves ranking to the caller.  It reuses the same model loader and article text
+    construction as the benchmark reranker without requiring benchmark manifests.
+    """
+    if not claim_text.strip():
+        raise EvidenceGapError("claim_text cannot be empty")
+    if batch_size <= 0:
+        raise EvidenceGapError("batch_size must be positive")
+    if max_length <= 0:
+        raise EvidenceGapError("max_length must be positive")
+    if amp not in {"fp16", "fp32"}:
+        raise EvidenceGapError("amp must be fp16 or fp32")
+    normalized_device = _normalize_devices([device])[0]
+    root = root.resolve()
+    resolved_model_dir = (root / (model_dir or DEFAULT_MODEL_DIR)).resolve()
+    if not resolved_model_dir.exists():
+        raise EvidenceGapError(
+            f"Missing MedCPT cross encoder: {resolved_model_dir}"
+        )
+    normalized_articles: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for index, article in enumerate(articles):
+        article_id = str(article.get("article_id", "")).strip()
+        if not article_id:
+            raise EvidenceGapError(f"Runtime article {index} has no article_id")
+        if article_id in seen:
+            raise EvidenceGapError(f"Duplicate runtime article_id: {article_id}")
+        seen.add(article_id)
+        title = str(article.get("title") or "")
+        abstract = str(article.get("abstract") or article.get("text") or "")
+        if not title.strip() and not abstract.strip():
+            raise EvidenceGapError(f"{article_id}: empty title and abstract")
+        normalized_articles.append(
+            {"article_id": article_id, "title": title, "abstract": abstract}
+        )
+
+    model_fp = _model_fingerprint(resolved_model_dir)
+    torch, tokenizer, model = _load_cross_encoder(
+        resolved_model_dir, device=normalized_device, amp=amp
+    )
+    started = time.perf_counter()
+    output: list[dict[str, Any]] = []
+    try:
+        for start in range(0, len(normalized_articles), batch_size):
+            batch = normalized_articles[start : start + batch_size]
+            claims = [claim_text] * len(batch)
+            article_texts = [
+                _article_text(row["title"], row["abstract"]) for row in batch
+            ]
+            encoded = tokenizer(
+                claims,
+                article_texts,
+                truncation=True,
+                padding=True,
+                max_length=max_length,
+                return_tensors="pt",
+            )
+            encoded = {key: value.to(normalized_device) for key, value in encoded.items()}
+            with torch.inference_mode():
+                logits = model(**encoded).logits
+            if logits.ndim != 2 or logits.shape[1] != 1:
+                raise EvidenceGapError(
+                    f"Unexpected cross-encoder logits shape: {tuple(logits.shape)}"
+                )
+            values = logits[:, 0].float().cpu().tolist()
+            if any(not math.isfinite(float(value)) for value in values):
+                raise EvidenceGapError("Cross encoder produced a non-finite score")
+            output.extend(
+                {
+                    "article_id": row["article_id"],
+                    "cross_encoder_score": float(score),
+                }
+                for row, score in zip(batch, values, strict=True)
+            )
+    finally:
+        try:
+            model.to("cpu")
+        except Exception:
+            pass
+        del model
+        del tokenizer
+        import gc
+
+        gc.collect()
+        if normalized_device.startswith("cuda") and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    elapsed = time.perf_counter() - started
+    return {
+        "scores": output,
+        "metadata": {
+            "model_path": relative_path(root, resolved_model_dir),
+            "model_fingerprint": model_fp,
+            "device": normalized_device,
+            "batch_size": batch_size,
+            "max_length": max_length,
+            "amp": amp,
+            "score_semantics": "raw_single_logit_higher_is_more_relevant",
+            "pairs": len(output),
+            "seconds": round(elapsed, 6),
+            "pairs_per_second": (
+                round(len(output) / elapsed, 6) if elapsed > 0 else None
+            ),
+        },
+    }

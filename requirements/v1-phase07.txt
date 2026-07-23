@@ -1,0 +1,11 @@
+# EvidenceGap V1 Phase 07 runtime pipeline
+# Install after the CUDA-compatible PyTorch wheel already used by this project.
+numpy>=1.26,<3
+scipy>=1.11
+pyarrow>=16,<22
+duckdb>=1.0,<2
+bm25s[core]>=0.2.0
+faiss-cpu>=1.8,<2
+transformers>=4.44,<6
+safetensors>=0.4
+stanza==1.14.0

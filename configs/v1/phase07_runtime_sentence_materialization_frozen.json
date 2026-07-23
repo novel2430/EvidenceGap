@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "phase07.runtime-sentence.v1",
+  "splitter": {
+    "library": "stanza",
+    "library_version": "1.14.0",
+    "language": "en",
+    "processors": {
+      "tokenize": "genia"
+    },
+    "download_method": "none_at_runtime"
+  },
+  "execution_defaults": {
+    "device": "cuda:0",
+    "tokenize_batch_size": 32,
+    "allow_cpu_fallback": false
+  },
+  "materialization": {
+    "title_policy": "one_separate_runtime_sentence_when_present",
+    "body_policy": "stanza_genia_sentence_segmentation",
+    "section_mode": "auto",
+    "compatibility_text_policy": "text_is_treated_as_abstract_body",
+    "content_normalization": "CRLF_to_LF_and_outer_trim_per_input_field",
+    "deduplicate_sentences": false,
+    "structured_abstract_parser": {
+      "parser_id": "phase07.structured-abstract-header.v1",
+      "activation_policy": "at_least_two_allowlisted_headers",
+      "header_text_policy": "stored_as_section_metadata_not_sentence_text",
+      "fallback_policy": "single_abstract_segment_when_structure_not_detected"
+    }
+  },
+  "identity": {
+    "sentence_id_excludes": [
+      "device",
+      "model_dir",
+      "batch_size",
+      "cpu_fallback"
+    ],
+    "sentence_id_includes": [
+      "article_id",
+      "canonical_source_text_sha256",
+      "semantic_splitter_fingerprint",
+      "character_offsets",
+      "sentence_text"
+    ]
+  }
+}
