@@ -59,3 +59,39 @@ __all__.extend([
     "validate_retrieval_adapter_artifact",
     "validate_runtime_evidence_rows",
 ])
+
+from evidencegap.pipeline.article_evidence import (
+    ARTICLE_EVIDENCE_CONTRACT_ID,
+    ARTICLE_EVIDENCE_SCHEMA_VERSION,
+    ARTICLE_EVIDENCE_PROMPT_VERSION,
+    load_article_prompt_inputs,
+    run_article_evidence_extractor,
+    validate_article_evidence_artifact,
+    validate_article_evidence_rows,
+)
+
+__all__.extend([
+    "ARTICLE_EVIDENCE_CONTRACT_ID",
+    "ARTICLE_EVIDENCE_SCHEMA_VERSION",
+    "ARTICLE_EVIDENCE_PROMPT_VERSION",
+    "load_article_prompt_inputs",
+    "run_article_evidence_extractor",
+    "validate_article_evidence_artifact",
+    "validate_article_evidence_rows",
+])
+
+from evidencegap.pipeline.claim_aggregation import (
+    CLAIM_AGGREGATION_CONTRACT_ID,
+    CLAIM_AGGREGATION_SCHEMA_VERSION,
+    aggregate_article_evidence_rows,
+    run_claim_aggregation,
+    validate_claim_aggregation_artifact,
+)
+
+__all__.extend([
+    "CLAIM_AGGREGATION_CONTRACT_ID",
+    "CLAIM_AGGREGATION_SCHEMA_VERSION",
+    "aggregate_article_evidence_rows",
+    "run_claim_aggregation",
+    "validate_claim_aggregation_artifact",
+])

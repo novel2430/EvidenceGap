@@ -16,7 +16,11 @@ from evidencegap.pipeline import (  # noqa: E402
     check_stanza_runtime,
     download_stanza_sentence_model,
     materialize_runtime_sentences,
+    run_article_evidence_extractor,
+    run_claim_aggregation,
     run_retrieval_adapters,
+    validate_article_evidence_artifact,
+    validate_claim_aggregation_artifact,
     validate_retrieval_adapter_artifact,
     validate_runtime_sentence_artifact,
 )
@@ -130,6 +134,65 @@ def build_parser() -> argparse.ArgumentParser:
     _root(validate_retrieval)
     validate_retrieval.add_argument("--artifact-dir", type=Path, required=True)
 
+    extract = sub.add_parser(
+        "extract-article-evidence",
+        help=(
+            "Let DeepSeek or Claude read every numbered abstract sentence for "
+            "each Top Article, select evidence sentence IDs, and judge article stance"
+        ),
+    )
+    _root(extract)
+    extract.add_argument("--retrieval-artifact-dir", type=Path, required=True)
+    extract.add_argument(
+        "--provider", choices=("deepseek", "anthropic"), required=True
+    )
+    extract.add_argument("--model")
+    extract.add_argument("--run-name")
+    extract.add_argument("--api-key-env")
+    extract.add_argument("--base-url")
+    extract.add_argument("--request-batch-size", type=int, default=2)
+    extract.add_argument("--max-tokens", type=int, default=4096)
+    extract.add_argument("--timeout-seconds", type=float, default=180.0)
+    extract.add_argument("--max-retries", type=int, default=4)
+    extract.add_argument(
+        "--thinking",
+        action="store_true",
+        help="Enable DeepSeek thinking mode; disabled by default",
+    )
+    extract.add_argument("--dry-run", action="store_true")
+    extract.add_argument("--cache-dir", type=Path)
+    extract.add_argument("--artifact-root", type=Path)
+    extract.add_argument("--force", action="store_true")
+
+    validate_article = sub.add_parser(
+        "validate-article-evidence",
+        help="Validate article-level LLM evidence IDs, stance rows, and checksums",
+    )
+    _root(validate_article)
+    validate_article.add_argument("--artifact-dir", type=Path, required=True)
+
+    aggregate = sub.add_parser(
+        "aggregate-claim",
+        help=(
+            "Aggregate article-level support/refute/insufficient results into a "
+            "transparent claim verdict"
+        ),
+    )
+    _root(aggregate)
+    aggregate.add_argument(
+        "--article-evidence-artifact-dir", type=Path, required=True
+    )
+    aggregate.add_argument("--run-name")
+    aggregate.add_argument("--artifact-root", type=Path)
+    aggregate.add_argument("--force", action="store_true")
+
+    validate_aggregation = sub.add_parser(
+        "validate-claim-aggregation",
+        help="Validate deterministic claim aggregation and source checksums",
+    )
+    _root(validate_aggregation)
+    validate_aggregation.add_argument("--artifact-dir", type=Path, required=True)
+
     return parser
 
 
@@ -194,6 +257,37 @@ def main() -> None:
         )
     elif args.command == "validate-retrieval-adapters":
         result = validate_retrieval_adapter_artifact(args.artifact_dir)
+    elif args.command == "extract-article-evidence":
+        result = run_article_evidence_extractor(
+            root,
+            retrieval_artifact_dir=args.retrieval_artifact_dir,
+            provider=args.provider,
+            model=args.model,
+            run_name=args.run_name,
+            api_key_env=args.api_key_env,
+            base_url=args.base_url,
+            request_batch_size=args.request_batch_size,
+            max_tokens=args.max_tokens,
+            timeout_seconds=args.timeout_seconds,
+            max_retries=args.max_retries,
+            thinking=args.thinking,
+            dry_run=args.dry_run,
+            cache_dir=args.cache_dir,
+            artifact_root=args.artifact_root,
+            force=args.force,
+        )
+    elif args.command == "validate-article-evidence":
+        result = validate_article_evidence_artifact(args.artifact_dir)
+    elif args.command == "aggregate-claim":
+        result = run_claim_aggregation(
+            root,
+            article_evidence_artifact_dir=args.article_evidence_artifact_dir,
+            run_name=args.run_name,
+            artifact_root=args.artifact_root,
+            force=args.force,
+        )
+    elif args.command == "validate-claim-aggregation":
+        result = validate_claim_aggregation_artifact(args.artifact_dir)
     else:
         raise AssertionError(args.command)
     print(json.dumps(result, ensure_ascii=False, indent=2))

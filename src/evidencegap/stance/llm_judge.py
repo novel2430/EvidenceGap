@@ -374,6 +374,145 @@ def _parse_json_content(content: str) -> Mapping[str, Any]:
     return payload
 
 
+
+def call_structured_llm(
+    *,
+    provider: str,
+    api_key: str,
+    base_url: str,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    response_schema: Mapping[str, Any],
+    max_tokens: int,
+    timeout_seconds: float,
+    thinking: bool = False,
+) -> ProviderResponse:
+    """Call a supported provider with a task-specific structured JSON prompt.
+
+    Phase 06 and Phase 07 use the same provider transport, response parsing,
+    truncation checks, and usage accounting.  Task-specific validation and
+    caching remain in the caller because their contracts differ.
+    """
+
+    provider = provider.strip().lower()
+    if provider not in SUPPORTED_PROVIDERS:
+        raise EvidenceGapError(
+            f"provider must be one of {SUPPORTED_PROVIDERS}, got {provider!r}"
+        )
+    if provider != "deepseek" and thinking:
+        raise EvidenceGapError("thinking is only supported for DeepSeek")
+    if provider == "deepseek":
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "response_format": {"type": "json_object"},
+            "max_tokens": max_tokens,
+            "stream": False,
+            "thinking": {"type": "enabled" if thinking else "disabled"},
+        }
+        response, raw = _post_json(
+            base_url.rstrip("/") + "/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            body=body,
+            timeout_seconds=timeout_seconds,
+        )
+        try:
+            choice = response["choices"][0]
+            content = choice["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise _ProviderError(
+                "Unexpected DeepSeek response shape: "
+                + json.dumps(response, ensure_ascii=False)[:2000],
+                retryable=True,
+            ) from exc
+        finish_reason = (
+            None if choice.get("finish_reason") is None else str(choice["finish_reason"])
+        )
+        if finish_reason == "length":
+            raise _ProviderError(
+                "DeepSeek output was truncated (finish_reason=length); increase --max-tokens or reduce --request-batch-size",
+                retryable=False,
+            )
+        usage_raw = response.get("usage") or {}
+        return ProviderResponse(
+            payload=_parse_json_content(str(content or "")),
+            request_id=None if response.get("id") is None else str(response["id"]),
+            usage={
+                "input_tokens": int(usage_raw.get("prompt_tokens") or 0),
+                "output_tokens": int(usage_raw.get("completion_tokens") or 0),
+                "total_tokens": int(usage_raw.get("total_tokens") or 0),
+            },
+            raw_response_sha256=sha256_text(raw),
+            finish_reason=finish_reason,
+        )
+
+    body = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": system_prompt,
+        "messages": [{"role": "user", "content": user_prompt}],
+        "output_config": {
+            "format": {
+                "type": "json_schema",
+                "schema": dict(response_schema),
+            }
+        },
+    }
+    thinking_config = _anthropic_thinking_config(model)
+    if thinking_config is not None:
+        body["thinking"] = thinking_config
+    response, raw = _post_json(
+        base_url.rstrip("/") + "/v1/messages",
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": ANTHROPIC_VERSION,
+            "Content-Type": "application/json",
+        },
+        body=body,
+        timeout_seconds=timeout_seconds,
+    )
+    stop_reason = (
+        None if response.get("stop_reason") is None else str(response["stop_reason"])
+    )
+    if stop_reason in {"max_tokens", "model_context_window_exceeded"}:
+        raise _ProviderError(
+            f"Claude output was truncated (stop_reason={stop_reason}); increase --max-tokens or reduce --request-batch-size",
+            retryable=False,
+        )
+    if stop_reason == "refusal":
+        raise _ProviderError("Claude refused the structured request", retryable=False)
+    content_blocks = response.get("content")
+    if not isinstance(content_blocks, list):
+        raise _ProviderError("Unexpected Claude content shape", retryable=True)
+    text_blocks = [
+        str(block.get("text"))
+        for block in content_blocks
+        if isinstance(block, Mapping) and block.get("type") == "text"
+    ]
+    if not text_blocks:
+        raise _ProviderError("Claude returned no text content block", retryable=True)
+    usage_raw = response.get("usage") or {}
+    input_tokens = int(usage_raw.get("input_tokens") or 0)
+    output_tokens = int(usage_raw.get("output_tokens") or 0)
+    return ProviderResponse(
+        payload=_parse_json_content("\n".join(text_blocks)),
+        request_id=None if response.get("id") is None else str(response["id"]),
+        usage={
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": input_tokens + output_tokens,
+        },
+        raw_response_sha256=sha256_text(raw),
+        finish_reason=stop_reason,
+    )
+
 def _call_deepseek(
     *,
     api_key: str,
