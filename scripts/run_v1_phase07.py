@@ -16,11 +16,15 @@ from evidencegap.pipeline import (  # noqa: E402
     check_stanza_runtime,
     download_stanza_sentence_model,
     materialize_runtime_sentences,
+    run_analysis,
     run_article_evidence_extractor,
     run_claim_aggregation,
+    run_final_graph,
     run_retrieval_adapters,
+    validate_analysis_artifact,
     validate_article_evidence_artifact,
     validate_claim_aggregation_artifact,
+    validate_final_graph_artifact,
     validate_retrieval_adapter_artifact,
     validate_runtime_sentence_artifact,
 )
@@ -193,6 +197,72 @@ def build_parser() -> argparse.ArgumentParser:
     _root(validate_aggregation)
     validate_aggregation.add_argument("--artifact-dir", type=Path, required=True)
 
+    final_graph = sub.add_parser(
+        "build-final-graph",
+        help=(
+            "Build the final Claim, Article, and grounded Evidence graph "
+            "from a validated claim aggregation artifact"
+        ),
+    )
+    _root(final_graph)
+    final_graph.add_argument(
+        "--claim-aggregation-artifact-dir", type=Path, required=True
+    )
+    final_graph.add_argument("--run-name")
+    final_graph.add_argument("--artifact-root", type=Path)
+    final_graph.add_argument("--force", action="store_true")
+
+    validate_graph = sub.add_parser(
+        "validate-final-graph",
+        help="Validate the final graph against its aggregation and article evidence sources",
+    )
+    _root(validate_graph)
+    validate_graph.add_argument("--artifact-dir", type=Path, required=True)
+
+    analyze = sub.add_parser(
+        "analyze",
+        help=(
+            "Run article retrieval, sentence materialization, article-level LLM "
+            "evidence extraction, claim aggregation, and Final Graph generation"
+        ),
+    )
+    _root(analyze)
+    analyze.add_argument("--claim", required=True)
+    analyze.add_argument("--run-name", required=True)
+    analyze.add_argument("--provider", choices=("deepseek", "anthropic"), required=True)
+    analyze.add_argument("--model")
+    analyze.add_argument("--device", default="cuda:0")
+    analyze.add_argument("--amp", choices=("fp16", "fp32"), default="fp16")
+    analyze.add_argument("--artifact-root", type=Path)
+    analyze.add_argument("--corpus-dir", type=Path)
+    analyze.add_argument("--article-input-dir", type=Path)
+    analyze.add_argument("--bm25-index-dir", type=Path)
+    analyze.add_argument("--medcpt-index-dir", type=Path)
+    analyze.add_argument("--bmretriever-index-dir", type=Path)
+    analyze.add_argument("--cross-encoder-model-dir", type=Path)
+    analyze.add_argument("--stanza-model-dir", type=Path)
+    analyze.add_argument("--stanza-package", default="genia")
+    analyze.add_argument("--stanza-batch-size", type=int, default=32)
+    analyze.add_argument("--cross-encoder-batch-size", type=int, default=16)
+    analyze.add_argument("--section-mode", choices=("auto", "none"), default="auto")
+    analyze.add_argument("--allow-cpu-fallback", action="store_true")
+    analyze.add_argument("--api-key-env")
+    analyze.add_argument("--base-url")
+    analyze.add_argument("--request-batch-size", type=int, default=2)
+    analyze.add_argument("--max-tokens", type=int, default=4096)
+    analyze.add_argument("--timeout-seconds", type=float, default=180.0)
+    analyze.add_argument("--max-retries", type=int, default=4)
+    analyze.add_argument("--thinking", action="store_true")
+    analyze.add_argument("--cache-dir", type=Path)
+    analyze.add_argument("--force", action="store_true")
+
+    validate_analysis = sub.add_parser(
+        "validate-analysis",
+        help="Validate the complete Phase 07 analysis artifact and all stage checksums",
+    )
+    _root(validate_analysis)
+    validate_analysis.add_argument("--artifact-dir", type=Path, required=True)
+
     return parser
 
 
@@ -288,6 +358,50 @@ def main() -> None:
         )
     elif args.command == "validate-claim-aggregation":
         result = validate_claim_aggregation_artifact(args.artifact_dir)
+    elif args.command == "build-final-graph":
+        result = run_final_graph(
+            root,
+            claim_aggregation_artifact_dir=args.claim_aggregation_artifact_dir,
+            run_name=args.run_name,
+            artifact_root=args.artifact_root,
+            force=args.force,
+        )
+    elif args.command == "validate-final-graph":
+        result = validate_final_graph_artifact(args.artifact_dir)
+    elif args.command == "analyze":
+        result = run_analysis(
+            root,
+            claim=args.claim,
+            run_name=args.run_name,
+            provider=args.provider,
+            model=args.model,
+            device=args.device,
+            amp=args.amp,
+            artifact_root=args.artifact_root,
+            corpus_dir=args.corpus_dir,
+            article_input_dir=args.article_input_dir,
+            bm25_index_dir=args.bm25_index_dir,
+            medcpt_index_dir=args.medcpt_index_dir,
+            bmretriever_index_dir=args.bmretriever_index_dir,
+            cross_encoder_model_dir=args.cross_encoder_model_dir,
+            stanza_model_dir=args.stanza_model_dir,
+            stanza_package=args.stanza_package,
+            stanza_batch_size=args.stanza_batch_size,
+            cross_encoder_batch_size=args.cross_encoder_batch_size,
+            section_mode=args.section_mode,
+            allow_cpu_fallback=args.allow_cpu_fallback,
+            api_key_env=args.api_key_env,
+            base_url=args.base_url,
+            request_batch_size=args.request_batch_size,
+            max_tokens=args.max_tokens,
+            timeout_seconds=args.timeout_seconds,
+            max_retries=args.max_retries,
+            thinking=args.thinking,
+            cache_dir=args.cache_dir,
+            force=args.force,
+        )
+    elif args.command == "validate-analysis":
+        result = validate_analysis_artifact(args.artifact_dir)
     else:
         raise AssertionError(args.command)
     print(json.dumps(result, ensure_ascii=False, indent=2))

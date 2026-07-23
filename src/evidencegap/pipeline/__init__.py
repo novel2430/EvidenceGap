@@ -95,3 +95,31 @@ __all__.extend([
     "run_claim_aggregation",
     "validate_claim_aggregation_artifact",
 ])
+from evidencegap.pipeline.final_graph import (
+    FINAL_GRAPH_CONTRACT_ID,
+    FINAL_GRAPH_SCHEMA_VERSION,
+    build_final_graph_bundle,
+    run_final_graph,
+    validate_final_graph_artifact,
+)
+
+__all__.extend([
+    "FINAL_GRAPH_CONTRACT_ID",
+    "FINAL_GRAPH_SCHEMA_VERSION",
+    "build_final_graph_bundle",
+    "run_final_graph",
+    "validate_final_graph_artifact",
+])
+from evidencegap.pipeline.analysis import (
+    ANALYSIS_CONTRACT_ID,
+    ANALYSIS_SCHEMA_VERSION,
+    run_analysis,
+    validate_analysis_artifact,
+)
+
+__all__.extend([
+    "ANALYSIS_CONTRACT_ID",
+    "ANALYSIS_SCHEMA_VERSION",
+    "run_analysis",
+    "validate_analysis_artifact",
+])
