@@ -123,3 +123,68 @@ __all__.extend([
     "run_analysis",
     "validate_analysis_artifact",
 ])
+from evidencegap.pipeline.statement_decomposition import (
+    STATEMENT_DECOMPOSITION_CONTRACT_ID,
+    STATEMENT_DECOMPOSITION_PROMPT_VERSION,
+    STATEMENT_DECOMPOSITION_SCHEMA_VERSION,
+    run_statement_decomposition,
+    validate_decomposition_bundle,
+    validate_statement_decomposition_artifact,
+)
+
+__all__.extend([
+    "STATEMENT_DECOMPOSITION_CONTRACT_ID",
+    "STATEMENT_DECOMPOSITION_PROMPT_VERSION",
+    "STATEMENT_DECOMPOSITION_SCHEMA_VERSION",
+    "run_statement_decomposition",
+    "validate_decomposition_bundle",
+    "validate_statement_decomposition_artifact",
+])
+
+from evidencegap.pipeline.statement_analysis import (
+    STATEMENT_ANALYSIS_CONTRACT_ID,
+    STATEMENT_ANALYSIS_SCHEMA_VERSION,
+    run_statement_analysis,
+    validate_statement_analysis_artifact,
+    validate_statement_analysis_bundle,
+)
+
+__all__.extend([
+    "STATEMENT_ANALYSIS_CONTRACT_ID",
+    "STATEMENT_ANALYSIS_SCHEMA_VERSION",
+    "run_statement_analysis",
+    "validate_statement_analysis_artifact",
+    "validate_statement_analysis_bundle",
+])
+
+from evidencegap.pipeline.statement_bundle import (
+    STATEMENT_BUNDLE_CONTRACT_ID,
+    STATEMENT_BUNDLE_SCHEMA_VERSION,
+    build_statement_bundle,
+    run_statement_bundle,
+    validate_statement_bundle,
+    validate_statement_bundle_artifact,
+)
+
+__all__.extend([
+    "STATEMENT_BUNDLE_CONTRACT_ID",
+    "STATEMENT_BUNDLE_SCHEMA_VERSION",
+    "build_statement_bundle",
+    "run_statement_bundle",
+    "validate_statement_bundle",
+    "validate_statement_bundle_artifact",
+])
+
+from evidencegap.pipeline.statement_run import (
+    STATEMENT_RUN_CONTRACT_ID,
+    STATEMENT_RUN_SCHEMA_VERSION,
+    run_statement_pipeline,
+    validate_statement_pipeline_artifact,
+)
+
+__all__.extend([
+    "STATEMENT_RUN_CONTRACT_ID",
+    "STATEMENT_RUN_SCHEMA_VERSION",
+    "run_statement_pipeline",
+    "validate_statement_pipeline_artifact",
+])

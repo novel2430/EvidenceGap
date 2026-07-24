@@ -197,13 +197,15 @@ class ArticleEvidencePromptTests(unittest.TestCase, ArticleEvidenceFixtureMixin)
     def test_system_prompt_enforces_claim_applicability(self) -> None:
         self.assertEqual(
             ARTICLE_EVIDENCE_PROMPT_VERSION,
-            "phase07_article_evidence_v2",
+            "phase07_article_evidence_v3",
         )
         self.assertIn("Check claim applicability", SYSTEM_PROMPT)
         self.assertIn("treatment study", SYSTEM_PROMPT)
         self.assertIn("prevention claim", SYSTEM_PROMPT)
         self.assertIn("respiratory support", SYSTEM_PROMPT)
         self.assertIn("two active doses", SYSTEM_PROMPT)
+        self.assertIn("probabilities` MUST be a JSON object", SYSTEM_PROMPT)
+        self.assertIn("After any internal reasoning", SYSTEM_PROMPT)
 
     def test_prompt_uses_all_abstract_sentences_but_not_title_as_selectable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir, fake_parquet_io():
@@ -218,6 +220,9 @@ class ArticleEvidencePromptTests(unittest.TestCase, ArticleEvidenceFixtureMixin)
             self.assertIn("S02", prompt)
             self.assertIn("Support trial", prompt)
             self.assertNotIn('"sentence_id": "S00"', prompt)
+            self.assertIn("REQUIRED OUTPUT JSON SHAPE", prompt)
+            self.assertIn('"probabilities": {', prompt)
+            self.assertIn("probabilities must be an object", prompt)
             self.assertEqual(
                 [str(value.source["sentence_text"]) for value in items[0].sentences],
                 [
@@ -362,6 +367,75 @@ class ArticleEvidenceExecutionTests(unittest.TestCase, ArticleEvidenceFixtureMix
                 selected[0]["sentence_text"],
                 "Vitamin D reduced respiratory infections compared with placebo.",
             )
+
+    def test_invalid_provider_payload_is_saved_for_debugging(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir, fake_parquet_io():
+            root = Path(temp_dir)
+            artifact = self._write_fixture(root)
+
+            invalid_response = ProviderResponse(
+                payload={
+                    "results": [
+                        {
+                            "article_id": "pmid:1",
+                            "label": "support",
+                            "probabilities": [0.9, 0.0, 0.1],
+                            "evidence_sentence_ids": ["S02"],
+                            "rationale": "Invalid fixture probabilities shape.",
+                        },
+                        {
+                            "article_id": "pmid:2",
+                            "label": "insufficient",
+                            "probabilities": [0.0, 0.0, 1.0],
+                            "evidence_sentence_ids": [],
+                            "rationale": "Invalid fixture probabilities shape.",
+                        },
+                    ]
+                },
+                request_id="req-invalid",
+                usage={"input_tokens": 100, "output_tokens": 40, "total_tokens": 140},
+                raw_response_sha256="b" * 64,
+                finish_reason="stop",
+            )
+
+            with (
+                patch.dict(os.environ, {"DEEPSEEK_API_KEY": "fixture"}, clear=True),
+                patch(
+                    "evidencegap.pipeline.article_evidence.call_structured_llm",
+                    return_value=invalid_response,
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    _ProviderError, "invalid provider payload saved to"
+                ):
+                    run_article_evidence_extractor(
+                        root,
+                        retrieval_artifact_dir=artifact,
+                        provider="deepseek",
+                        run_name="invalid",
+                        request_batch_size=2,
+                        max_retries=0,
+                        thinking=True,
+                        artifact_root=root / "article_evidence",
+                        cache_dir=root / "cache",
+                    )
+
+            failures = list(
+                (root / "article_evidence/debug/article_evidence_failed_responses").glob(
+                    "*_attempt_01.json"
+                )
+            )
+            self.assertEqual(len(failures), 1)
+            failure = json.loads(failures[0].read_text(encoding="utf-8"))
+            self.assertEqual(failure["validation_error"], "probabilities must be an object")
+            self.assertTrue(failure["thinking"])
+            self.assertEqual(failure["article_ids"], ["pmid:1", "pmid:2"])
+            self.assertEqual(
+                failure["response"]["payload"]["results"][0]["probabilities"],
+                [0.9, 0.0, 0.1],
+            )
+            self.assertEqual(failure["response"]["request_id"], "req-invalid")
+
 
 
 if __name__ == "__main__":
