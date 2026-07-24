@@ -128,6 +128,7 @@ from evidencegap.pipeline.statement_decomposition import (
     STATEMENT_DECOMPOSITION_PROMPT_VERSION,
     STATEMENT_DECOMPOSITION_SCHEMA_VERSION,
     run_statement_decomposition,
+    runtime_inference_step_id,
     validate_decomposition_bundle,
     validate_statement_decomposition_artifact,
 )
@@ -137,6 +138,7 @@ __all__.extend([
     "STATEMENT_DECOMPOSITION_PROMPT_VERSION",
     "STATEMENT_DECOMPOSITION_SCHEMA_VERSION",
     "run_statement_decomposition",
+    "runtime_inference_step_id",
     "validate_decomposition_bundle",
     "validate_statement_decomposition_artifact",
 ])

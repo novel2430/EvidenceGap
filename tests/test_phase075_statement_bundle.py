@@ -34,6 +34,7 @@ from evidencegap.pipeline.statement_bundle import (  # noqa: E402
     validate_statement_bundle_artifact,
 )
 from evidencegap.pipeline.statement_decomposition import (  # noqa: E402
+    runtime_inference_step_id,
     validate_response_payload,
 )
 
@@ -278,9 +279,17 @@ class StatementBundleTests(unittest.TestCase):
         self.assertEqual(len(bundle["evidence"]), 1)
         self.assertNotIn("stance", bundle["evidence"][0])
         self.assertTrue(bundle["evidence"][0]["evidence_id"].startswith(first_id))
+        inference_step = bundle["inference_steps"][0]
         self.assertEqual(
-            bundle["inference_steps"][0]["conclusion_claim_id"],
+            inference_step["conclusion_claim_id"],
             decomposition["claims"][1]["claim_id"],
+        )
+        self.assertEqual(
+            inference_step["inference_step_id"],
+            runtime_inference_step_id(
+                inference_step["premise_claim_ids"],
+                inference_step["conclusion_claim_id"],
+            ),
         )
         self.assertEqual(validate_statement_bundle(bundle)["status"], "PASS")
 

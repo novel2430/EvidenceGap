@@ -28,34 +28,45 @@ from evidencegap.stance.llm_judge import (
     call_structured_llm,
 )
 
-STATEMENT_DECOMPOSITION_SCHEMA_VERSION = "1.0.0"
+STATEMENT_DECOMPOSITION_SCHEMA_VERSION = "1.1.0"
 STATEMENT_DECOMPOSITION_CONTRACT_ID = "phase075.statement-decomposition.v1"
-STATEMENT_DECOMPOSITION_PROMPT_VERSION = "phase075_statement_decomposition_v2"
+STATEMENT_DECOMPOSITION_PROMPT_VERSION = "phase075_statement_decomposition_v3"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/pipeline/statement_decomposition")
 
-SYSTEM_PROMPT = """You extract biomedical claims from a user statement.
+SYSTEM_PROMPT = """You perform argument-preserving decomposition of a biomedical statement.
 
-Your only task is to identify claims that can be directly supported or refuted by biomedical research literature and rewrite each one as a canonical English claim.
+Your only task is to extract the smallest complete set of biomedical claims that can each be independently supported or refuted by biomedical research literature, while preserving the explicit premise-to-conclusion structure asserted by the input.
+
+Do not assess whether the claims are true, whether an inference is valid, or whether any scope or causal gap exists in this request.
 
 Rules:
 - Use only information stated in the input. Do not use outside knowledge.
-- Extract only directly verifiable biomedical claims.
-- Exclude policy proposals, value judgments, personal advice, calls to action, rhetorical language, and other statements that biomedical literature cannot directly verify.
+- Extract only biomedical claims that can, in principle, be independently evaluated using biomedical research literature.
+- Exclude policy proposals, value judgments, personal advice, calls to action, commercial or institutional decisions, rhetorical language, and other statements that biomedical literature cannot directly verify.
 - Do not invent a biomedical claim merely to produce output. If none exists, return an empty claims list and an empty inference_steps list.
+- Treat claim extraction and argument-structure preservation as equally required outputs.
+- When the input explicitly presents one or more extracted biomedical claims as reasons for another extracted biomedical claim, keep the premises and conclusion as separate claims and create an inference_step linking them.
+- Preserve explicit intermediate biomedical conclusions. A claim may be the conclusion of one inference_step and a premise of a later inference_step.
+- Do not collapse an explicit multi-step chain into a shortcut. For A -> B and B -> C, return those two steps; do not add A -> C unless the input explicitly asserts it.
+- Keep an explicitly stated, independently verifiable biomedical conclusion even when it partially overlaps with its premises. Do not remove it merely because it can also be searched directly in the literature.
+- Each inference_step must represent one direct premise-to-conclusion relationship asserted by the input. Do not create transitive links, hidden assumptions, bridge claims, or medically plausible relationships that the input does not state.
+- Do not classify inference type, judge logical validity, identify gaps, or modify a claim because the reasoning appears weak. A later request will analyze the extracted inference_steps.
+- If a non-verifiable clause is omitted, also omit any inference_step that would require that omitted clause as a premise or conclusion.
 - Each claim must contain exactly one independently testable biomedical outcome assertion.
 - When one source clause says that the same exposure or intervention affects multiple separable outcomes, create one claim per outcome and repeat the shared population, exposure or intervention, comparator, dose, timing, uncertainty, and causal strength in each claim.
 - Do not merge separable outcomes merely because they share the same population, exposure, intervention, or sentence. For example, "sleep insufficiency increases obesity and type 2 diabetes risk" must become two claims: one about obesity risk and one about type 2 diabetes risk.
 - Also keep prevention separate from treatment, disease incidence separate from severity or control in existing patients, and benefits separate from harms when they are independently testable.
 - Do not split a single established composite endpoint or a phrase whose words jointly name one outcome.
 - The same exact source_text quote may ground more than one claim when that quote contains multiple independently testable outcomes.
-- Return the smallest complete set of non-duplicate claims.
+- Return the smallest complete argument-preserving set of non-duplicate claims.
 - Preserve every material qualifier from the source, including population, intervention or exposure, comparator, dose, outcome, timing, uncertainty, causal strength, and prevention-versus-treatment scope.
 - Do not strengthen possibility into certainty, association into causation, or a narrow population into a general population.
 - source_language must identify the input language with a concise BCP 47 language tag such as en, zh-TW, ja, or ko.
 - source_text must be an exact contiguous quote copied from the input statement.
 - canonical_claim_en must be a concise English declarative sentence.
 - Use claim_ref values C1, C2, C3, ... in claims array order.
-- inference_steps may only describe explicit premise-to-conclusion relationships among the extracted biomedical claims. Do not invent missing reasoning. If no such relationship is explicit, return an empty inference_steps list.
+- inference_steps may reference only extracted claim_ref values. premise_claim_refs must be non-empty and must not contain the conclusion_claim_ref.
+- If the input contains no explicit premise-to-conclusion relationship among the extracted claims, return an empty inference_steps list.
 - Return JSON only."""
 
 
@@ -72,6 +83,10 @@ def response_json_schema() -> dict[str, Any]:
             },
             "claims": {
                 "type": "array",
+                "description": (
+                    "The smallest complete argument-preserving set of independently "
+                    "verifiable biomedical claims extracted from the statement."
+                ),
                 "items": {
                     "type": "object",
                     "properties": {
@@ -89,6 +104,11 @@ def response_json_schema() -> dict[str, Any]:
             },
             "inference_steps": {
                 "type": "array",
+                "description": (
+                    "Direct premise-to-conclusion relationships explicitly asserted "
+                    "by the input. These links describe the source argument and do "
+                    "not validate its reasoning."
+                ),
                 "items": {
                     "type": "object",
                     "properties": {
@@ -113,7 +133,11 @@ def response_json_schema() -> dict[str, Any]:
 
 def build_user_prompt(statement: str, *, retry_note: str | None = None) -> str:
     parts = [
-        "Extract directly verifiable biomedical claims from this statement.",
+        (
+            "Decompose this biomedical statement into independently verifiable "
+            "claims and preserve every explicit premise-to-conclusion relationship "
+            "among those claims. Do not analyze inference validity or gaps."
+        ),
         "INPUT STATEMENT:",
         statement,
     ]
@@ -125,6 +149,23 @@ def build_user_prompt(statement: str, *, retry_note: str | None = None) -> str:
             ]
         )
     return "\n\n".join(parts)
+
+
+def runtime_inference_step_id(
+    premise_claim_ids: list[str], conclusion_claim_id: str
+) -> str:
+    normalized_premises = sorted(str(value).strip() for value in premise_claim_ids)
+    conclusion = str(conclusion_claim_id).strip()
+    identity_payload = json.dumps(
+        {
+            "premise_claim_ids": normalized_premises,
+            "conclusion_claim_id": conclusion,
+        },
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return "inference_" + sha256_text(identity_payload)[:24]
 
 
 def _statement_id(statement: str) -> str:
@@ -214,6 +255,7 @@ def validate_response_payload(
         )
 
     inference_steps: list[dict[str, Any]] = []
+    inference_step_keys: set[tuple[tuple[str, ...], str]] = set()
     for index, raw_step in enumerate(raw_steps):
         if not isinstance(raw_step, Mapping):
             raise _ProviderError(
@@ -244,10 +286,22 @@ def validate_response_payload(
             or conclusion_ref in premise_refs
         ):
             raise _ProviderError("Invalid inference step references", retryable=True)
+        step_key = (tuple(sorted(premise_refs)), conclusion_ref)
+        if step_key in inference_step_keys:
+            raise _ProviderError(
+                "inference_steps must not contain duplicate relationships",
+                retryable=True,
+            )
+        inference_step_keys.add(step_key)
+        premise_claim_ids = [ref_to_id[value] for value in premise_refs]
+        conclusion_claim_id = ref_to_id[conclusion_ref]
         inference_steps.append(
             {
-                "premise_claim_ids": [ref_to_id[value] for value in premise_refs],
-                "conclusion_claim_id": ref_to_id[conclusion_ref],
+                "inference_step_id": runtime_inference_step_id(
+                    premise_claim_ids, conclusion_claim_id
+                ),
+                "premise_claim_ids": premise_claim_ids,
+                "conclusion_claim_id": conclusion_claim_id,
             }
         )
 
@@ -303,14 +357,23 @@ def validate_decomposition_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         )
     if not claims and inference_steps:
         raise EvidenceGapError("Empty decomposition cannot contain inference steps")
+    inference_step_keys: set[tuple[tuple[str, ...], str]] = set()
+    inference_step_ids: set[str] = set()
     for step in inference_steps:
         if not isinstance(step, Mapping):
             raise EvidenceGapError("Statement decomposition step must be an object")
         premises = step.get("premise_claim_ids")
-        conclusion = str(step.get("conclusion_claim_id") or "")
-        if not isinstance(premises, list) or not premises:
+        conclusion = str(step.get("conclusion_claim_id") or "").strip()
+        if (
+            not isinstance(premises, list)
+            or not premises
+            or any(
+                not isinstance(value, str) or not value.strip()
+                for value in premises
+            )
+        ):
             raise EvidenceGapError("Inference premises must be a non-empty array")
-        premise_ids = [str(value) for value in premises]
+        premise_ids = [value.strip() for value in premises]
         if (
             len(premise_ids) != len(set(premise_ids))
             or not set(premise_ids).issubset(claim_ids)
@@ -318,6 +381,22 @@ def validate_decomposition_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
             or conclusion in premise_ids
         ):
             raise EvidenceGapError("Invalid statement decomposition inference step")
+        step_key = (tuple(sorted(premise_ids)), conclusion)
+        inference_step_id = str(step.get("inference_step_id") or "").strip()
+        expected_step_id = runtime_inference_step_id(premise_ids, conclusion)
+        if inference_step_id != expected_step_id:
+            raise EvidenceGapError(
+                "Statement decomposition inference_step_id mismatch"
+            )
+        if (
+            step_key in inference_step_keys
+            or inference_step_id in inference_step_ids
+        ):
+            raise EvidenceGapError(
+                "Statement decomposition contains duplicate inference steps"
+            )
+        inference_step_keys.add(step_key)
+        inference_step_ids.add(inference_step_id)
 
     return {
         "status": "PASS",

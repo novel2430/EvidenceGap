@@ -21,9 +21,12 @@ from evidencegap.pipeline.statement_analysis import (
     validate_statement_analysis_artifact,
     validate_statement_analysis_bundle,
 )
-from evidencegap.pipeline.statement_decomposition import validate_decomposition_bundle
+from evidencegap.pipeline.statement_decomposition import (
+    runtime_inference_step_id,
+    validate_decomposition_bundle,
+)
 
-STATEMENT_BUNDLE_SCHEMA_VERSION = "1.0.0"
+STATEMENT_BUNDLE_SCHEMA_VERSION = "1.1.0"
 STATEMENT_BUNDLE_CONTRACT_ID = "phase075.statement-bundle.v1"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/pipeline/statement_bundle")
 _VALID_VERDICTS = {"supported", "refuted", "mixed", "insufficient"}
@@ -249,6 +252,7 @@ def build_statement_bundle(
         "claims": claims,
         "inference_steps": [
             {
+                "inference_step_id": str(step["inference_step_id"]),
                 "premise_claim_ids": list(step["premise_claim_ids"]),
                 "conclusion_claim_id": str(step["conclusion_claim_id"]),
             }
@@ -328,19 +332,42 @@ def validate_statement_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
             raise EvidenceGapError("Invalid failed claim result")
         claim_by_id[claim_id] = claim
 
+    inference_step_ids: set[str] = set()
+    inference_step_keys: set[tuple[tuple[str, ...], str]] = set()
     for step in steps:
         if not isinstance(step, Mapping):
             raise EvidenceGapError("Invalid inference step")
         premises = step.get("premise_claim_ids")
-        conclusion = str(step.get("conclusion_claim_id") or "")
+        conclusion = str(step.get("conclusion_claim_id") or "").strip()
         if (
             not isinstance(premises, list)
             or not premises
-            or not set(premises).issubset(claim_by_id)
-            or conclusion not in claim_by_id
-            or conclusion in premises
+            or any(
+                not isinstance(value, str) or not value.strip()
+                for value in premises
+            )
         ):
             raise EvidenceGapError("Invalid inference step references")
+        premise_ids = [value.strip() for value in premises]
+        if (
+            len(premise_ids) != len(set(premise_ids))
+            or not set(premise_ids).issubset(claim_by_id)
+            or conclusion not in claim_by_id
+            or conclusion in premise_ids
+        ):
+            raise EvidenceGapError("Invalid inference step references")
+        inference_step_id = str(step.get("inference_step_id") or "").strip()
+        expected_step_id = runtime_inference_step_id(premise_ids, conclusion)
+        step_key = (tuple(sorted(premise_ids)), conclusion)
+        if inference_step_id != expected_step_id:
+            raise EvidenceGapError("Invalid inference step identity")
+        if (
+            inference_step_id in inference_step_ids
+            or step_key in inference_step_keys
+        ):
+            raise EvidenceGapError("Duplicate inference step")
+        inference_step_ids.add(inference_step_id)
+        inference_step_keys.add(step_key)
 
     article_by_id: dict[str, Mapping[str, Any]] = {}
     for article in articles:
