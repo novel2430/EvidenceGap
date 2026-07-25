@@ -15,6 +15,11 @@ from evidencegap.common import (
     sha256_file,
     sha256_text,
 )
+from evidencegap.output.presentation import run_output_module, validate_output_artifact
+from evidencegap.pipeline.inference_gap_analysis import (
+    run_inference_gap_analysis,
+    validate_inference_gap_analysis_artifact,
+)
 from evidencegap.pipeline.statement_analysis import (
     run_statement_analysis,
     validate_statement_analysis_artifact,
@@ -28,14 +33,16 @@ from evidencegap.pipeline.statement_decomposition import (
     validate_statement_decomposition_artifact,
 )
 
-STATEMENT_RUN_SCHEMA_VERSION = "1.0.0"
-STATEMENT_RUN_CONTRACT_ID = "phase075.statement-run.v1"
+STATEMENT_RUN_SCHEMA_VERSION = "2.0.0"
+STATEMENT_RUN_CONTRACT_ID = "phase077.complete-run.v1"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/pipeline/statement_run")
 
 _STAGE_NAMES = {
     "decomposition": "decomposition",
     "analysis": "analysis",
     "bundle": "bundle",
+    "gaps": "gaps",
+    "output": "output",
 }
 
 
@@ -85,6 +92,19 @@ def _stage_meta(root: Path, artifact_dir: Path) -> dict[str, Any]:
     }
 
 
+def _resolve_deepseek_thinking(
+    provider: str,
+    value: bool | None,
+    *,
+    label: str,
+) -> bool:
+    if provider == "deepseek":
+        return True if value is None else value
+    if value is True:
+        raise EvidenceGapError(f"{label} thinking is only supported for DeepSeek")
+    return False
+
+
 def run_statement_pipeline(
     root: Path,
     *,
@@ -112,27 +132,49 @@ def run_statement_pipeline(
     decomposition_max_tokens: int = 2048,
     request_batch_size: int = 2,
     max_tokens: int = 4096,
+    gap_max_tokens: int = 4096,
+    language: str = "English",
+    translation_max_tokens: int = 8192,
+    translation_request_batch_size: int = 32,
     timeout_seconds: float = 180.0,
     max_retries: int = 4,
     decomposition_thinking: bool = False,
     analysis_thinking: bool | None = None,
+    gap_thinking: bool | None = None,
     cache_dir: Path | None = None,
     force: bool = False,
 ) -> dict[str, Any]:
     root = root.resolve()
     statement = statement.strip()
+    language = language.strip()
     if not statement:
         raise EvidenceGapError("Statement cannot be blank")
-    if decomposition_max_tokens <= 0:
-        raise EvidenceGapError("decomposition_max_tokens must be positive")
-    if provider == "deepseek":
-        resolved_analysis_thinking = (
-            True if analysis_thinking is None else analysis_thinking
+    if not language:
+        raise EvidenceGapError("language cannot be blank")
+    if any(
+        value <= 0
+        for value in (
+            decomposition_max_tokens,
+            request_batch_size,
+            max_tokens,
+            gap_max_tokens,
+            translation_max_tokens,
+            translation_request_batch_size,
+            timeout_seconds,
         )
-    else:
-        if decomposition_thinking or analysis_thinking is True:
-            raise EvidenceGapError("Thinking mode is only supported for DeepSeek")
-        resolved_analysis_thinking = False
+    ):
+        raise EvidenceGapError("Run token, batch, and timeout parameters must be positive")
+    if max_retries < 0:
+        raise EvidenceGapError("max_retries cannot be negative")
+
+    resolved_analysis_thinking = _resolve_deepseek_thinking(
+        provider, analysis_thinking, label="Analysis"
+    )
+    resolved_gap_thinking = _resolve_deepseek_thinking(
+        provider, gap_thinking, label="Gap analysis"
+    )
+    if provider != "deepseek" and decomposition_thinking:
+        raise EvidenceGapError("Decomposition thinking is only supported for DeepSeek")
 
     name = _safe_name(run_name)
     base = artifact_root.resolve() if artifact_root else root / DEFAULT_ARTIFACT_ROOT
@@ -150,6 +192,7 @@ def run_statement_pipeline(
             "run_name": name,
             "statement": statement,
             "statement_sha256": sha256_text(statement),
+            "language": language,
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
     )
@@ -214,6 +257,44 @@ def run_statement_pipeline(
     bundle_dir = target / _STAGE_NAMES["bundle"]
     bundle_path = bundle_dir / "statement_bundle.json"
 
+    gap_result = run_inference_gap_analysis(
+        root,
+        statement_bundle_artifact_dir=bundle_dir,
+        provider=provider,
+        run_name=_STAGE_NAMES["gaps"],
+        model=model,
+        api_key_env=api_key_env,
+        base_url=base_url,
+        max_tokens=gap_max_tokens,
+        timeout_seconds=timeout_seconds,
+        max_retries=max_retries,
+        thinking=resolved_gap_thinking,
+        artifact_root=target,
+        force=False,
+    )
+    gap_dir = target / _STAGE_NAMES["gaps"]
+    gap_path = gap_dir / "inference_gap_analysis.json"
+
+    output_result = run_output_module(
+        root,
+        statement_bundle_artifact_dir=bundle_dir,
+        inference_gap_artifact_dir=gap_dir,
+        run_name=_STAGE_NAMES["output"],
+        language=language,
+        provider=provider,
+        model=model,
+        api_key_env=api_key_env,
+        base_url=base_url,
+        max_tokens=translation_max_tokens,
+        request_batch_size=translation_request_batch_size,
+        timeout_seconds=timeout_seconds,
+        max_retries=max_retries,
+        artifact_root=target,
+        force=False,
+    )
+    output_dir = target / _STAGE_NAMES["output"]
+    presentation_path = output_dir / "presentation_bundle.json"
+
     stages = {
         key: _stage_meta(root, target / directory)
         for key, directory in _STAGE_NAMES.items()
@@ -228,36 +309,61 @@ def run_statement_pipeline(
             "evidence",
         )
     }
+    counts.update(
+        {
+            "total_inference_steps": int(gap_result["total_inference_steps"]),
+            "scope_gaps": int(gap_result["scope_gaps"]),
+            "causal_gaps": int(gap_result["causal_gaps"]),
+            "gap_api_requests": int(gap_result["api_requests"]),
+            "translation_api_requests": int(output_result["api_requests"]),
+        }
+    )
     manifest = {
         "schema_version": STATEMENT_RUN_SCHEMA_VERSION,
         "contract_id": STATEMENT_RUN_CONTRACT_ID,
-        "run_type": "phase075_end_to_end_statement_analysis",
+        "run_type": "phase077_end_to_end_presentation",
         "run_name": name,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "statement_id": decomposition_result["statement_id"],
         "analysis_status": analysis_result["analysis_status"],
+        "output_language": output_result["output_language"],
+        "localized": output_result["localized"],
         "execution": {
             "provider": provider,
             "model": model,
             "device": device,
             "amp": amp,
             "decomposition_max_tokens": decomposition_max_tokens,
-            "request_batch_size": request_batch_size,
-            "max_tokens": max_tokens,
+            "analysis_request_batch_size": request_batch_size,
+            "analysis_max_tokens": max_tokens,
+            "gap_max_tokens": gap_max_tokens,
+            "translation_max_tokens": translation_max_tokens,
+            "translation_request_batch_size": translation_request_batch_size,
             "decomposition_thinking": (
                 decomposition_thinking if provider == "deepseek" else None
             ),
             "analysis_thinking": (
                 resolved_analysis_thinking if provider == "deepseek" else None
             ),
+            "gap_thinking": (
+                resolved_gap_thinking if provider == "deepseek" else None
+            ),
         },
         "stages": stages,
         "counts": counts,
-        "output": {
+        "outputs": {
             "statement_bundle": {
                 "path": relative_path(root, bundle_path),
                 "sha256": sha256_file(bundle_path),
-            }
+            },
+            "inference_gap_analysis": {
+                "path": relative_path(root, gap_path),
+                "sha256": sha256_file(gap_path),
+            },
+            "presentation_bundle": {
+                "path": relative_path(root, presentation_path),
+                "sha256": sha256_file(presentation_path),
+            },
         },
         "seconds": round(time.perf_counter() - started, 6),
     }
@@ -270,9 +376,13 @@ def run_statement_pipeline(
         "artifact_dir": relative_path(root, target),
         "statement_id": decomposition_result["statement_id"],
         "analysis_status": analysis_result["analysis_status"],
+        "output_language": output_result["output_language"],
+        "localized": output_result["localized"],
         **counts,
         "empty_claims": counts["total_claims"] == 0,
         "statement_bundle_path": relative_path(root, bundle_path),
+        "inference_gap_analysis_path": relative_path(root, gap_path),
+        "presentation_bundle_path": relative_path(root, presentation_path),
     }
 
 
@@ -293,6 +403,8 @@ def validate_statement_pipeline_artifact(artifact_dir: Path) -> dict[str, Any]:
         raise EvidenceGapError("Statement run request identity mismatch")
     if request.get("run_name") != manifest.get("run_name"):
         raise EvidenceGapError("Statement run name mismatch")
+    if request.get("language") != manifest.get("output_language"):
+        raise EvidenceGapError("Statement run output language mismatch")
 
     root = _find_repo_root(artifact_dir)
     stages = manifest.get("stages")
@@ -323,6 +435,8 @@ def validate_statement_pipeline_artifact(artifact_dir: Path) -> dict[str, Any]:
     )
     analysis_validation = validate_statement_analysis_artifact(stage_dirs["analysis"])
     bundle_validation = validate_statement_bundle_artifact(stage_dirs["bundle"])
+    gap_validation = validate_inference_gap_analysis_artifact(stage_dirs["gaps"])
+    output_validation = validate_output_artifact(stage_dirs["output"])
 
     analysis_request = _read_json_object(stage_dirs["analysis"] / "request.json")
     if _resolve(
@@ -336,10 +450,25 @@ def validate_statement_pipeline_artifact(artifact_dir: Path) -> dict[str, Any]:
     ) != stage_dirs["analysis"]:
         raise EvidenceGapError("Statement run bundle source mismatch")
 
+    gap_request = _read_json_object(stage_dirs["gaps"] / "request.json")
+    if _resolve(
+        root, str(gap_request.get("statement_bundle_artifact_dir") or "")
+    ) != stage_dirs["bundle"]:
+        raise EvidenceGapError("Statement run gap source mismatch")
+    output_request = _read_json_object(stage_dirs["output"] / "request.json")
+    if _resolve(
+        root, str(output_request.get("statement_bundle_artifact_dir") or "")
+    ) != stage_dirs["bundle"] or _resolve(
+        root, str(output_request.get("inference_gap_artifact_dir") or "")
+    ) != stage_dirs["gaps"]:
+        raise EvidenceGapError("Statement run output source mismatch")
+
     statement_ids = {
         decomposition_validation.get("statement_id"),
         analysis_validation.get("statement_id"),
         bundle_validation.get("statement_id"),
+        gap_validation.get("statement_id"),
+        output_validation.get("statement_id"),
         manifest.get("statement_id"),
     }
     if len(statement_ids) != 1:
@@ -348,18 +477,30 @@ def validate_statement_pipeline_artifact(artifact_dir: Path) -> dict[str, Any]:
         "analysis_status"
     ) or manifest.get("analysis_status") != bundle_validation.get("analysis_status"):
         raise EvidenceGapError("Statement run analysis status mismatch")
+    if output_validation.get("output_language") != manifest.get("output_language"):
+        raise EvidenceGapError("Statement run presentation language mismatch")
+    if bool(output_validation.get("localized")) != bool(manifest.get("localized")):
+        raise EvidenceGapError("Statement run localization status mismatch")
 
-    output = manifest.get("output")
-    output_meta = output.get("statement_bundle") if isinstance(output, Mapping) else None
-    if not isinstance(output_meta, Mapping):
+    outputs = manifest.get("outputs")
+    if not isinstance(outputs, Mapping):
         raise EvidenceGapError("Statement run output metadata is missing")
-    bundle_path = _resolve(root, str(output_meta.get("path") or ""))
-    if (
-        bundle_path != stage_dirs["bundle"] / "statement_bundle.json"
-        or not bundle_path.is_file()
-        or sha256_file(bundle_path) != str(output_meta.get("sha256") or "")
-    ):
-        raise EvidenceGapError("Statement run output checksum mismatch")
+    expected_output_paths = {
+        "statement_bundle": stage_dirs["bundle"] / "statement_bundle.json",
+        "inference_gap_analysis": stage_dirs["gaps"] / "inference_gap_analysis.json",
+        "presentation_bundle": stage_dirs["output"] / "presentation_bundle.json",
+    }
+    for key, expected_path in expected_output_paths.items():
+        output_meta = outputs.get(key)
+        if not isinstance(output_meta, Mapping):
+            raise EvidenceGapError(f"Statement run {key} metadata is missing")
+        actual_path = _resolve(root, str(output_meta.get("path") or ""))
+        if (
+            actual_path != expected_path
+            or not actual_path.is_file()
+            or sha256_file(actual_path) != str(output_meta.get("sha256") or "")
+        ):
+            raise EvidenceGapError(f"Statement run {key} checksum mismatch")
 
     expected_counts = {
         key: int(bundle_validation[key])
@@ -371,6 +512,13 @@ def validate_statement_pipeline_artifact(artifact_dir: Path) -> dict[str, Any]:
             "evidence",
         )
     }
+    expected_counts.update(
+        {
+            "total_inference_steps": int(gap_validation["total_inference_steps"]),
+            "scope_gaps": int(gap_validation["scope_gaps"]),
+            "causal_gaps": int(gap_validation["causal_gaps"]),
+        }
+    )
     counts = manifest.get("counts")
     if not isinstance(counts, Mapping) or any(
         int(counts.get(key, -1)) != value for key, value in expected_counts.items()
@@ -382,8 +530,18 @@ def validate_statement_pipeline_artifact(artifact_dir: Path) -> dict[str, Any]:
         "run_name": manifest.get("run_name"),
         "statement_id": manifest.get("statement_id"),
         "analysis_status": manifest.get("analysis_status"),
+        "output_language": manifest.get("output_language"),
+        "localized": bool(manifest.get("localized")),
         **expected_counts,
         "empty_claims": expected_counts["total_claims"] == 0,
-        "statement_bundle_path": relative_path(root, bundle_path),
+        "statement_bundle_path": relative_path(
+            root, expected_output_paths["statement_bundle"]
+        ),
+        "inference_gap_analysis_path": relative_path(
+            root, expected_output_paths["inference_gap_analysis"]
+        ),
+        "presentation_bundle_path": relative_path(
+            root, expected_output_paths["presentation_bundle"]
+        ),
         "checksums": "PASS",
     }

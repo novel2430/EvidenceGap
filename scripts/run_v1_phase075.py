@@ -70,7 +70,7 @@ def _phase07_options(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="EvidenceGap V1 Phase 7.5 multilingual multi-claim pipeline"
+        description="EvidenceGap V1 complete statement-to-presentation pipeline"
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -160,8 +160,9 @@ def build_parser() -> argparse.ArgumentParser:
     run = sub.add_parser(
         "run",
         help=(
-            "Run Phase 7.5 end to end: multilingual decomposition, sequential "
-            "Phase 07 analyses, and final statement bundle assembly"
+            "Run the latest flow end to end: argument-preserving decomposition, "
+            "Claim evidence analysis, statement bundle, inference Gap analysis, "
+            "and optional localized presentation output"
         ),
     )
     _root(run)
@@ -175,6 +176,22 @@ def build_parser() -> argparse.ArgumentParser:
         max_tokens_default=8192,
     )
     run.add_argument("--decomposition-max-tokens", type=int, default=2048)
+    run.add_argument("--gap-max-tokens", type=int, default=4096)
+    run.add_argument(
+        "--language",
+        default="English",
+        help=(
+            "Free-form output language. English is the default and skips the "
+            "translation LLM request."
+        ),
+    )
+    run.add_argument("--translation-max-tokens", type=int, default=8192)
+    run.add_argument(
+        "--translation-request-batch-size",
+        type=int,
+        default=32,
+        help="Maximum localization text units per LLM request",
+    )
     run.add_argument(
         "--decomposition-thinking",
         action="store_true",
@@ -195,13 +212,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Disable DeepSeek thinking for Phase 07 analysis",
     )
     run.set_defaults(analysis_thinking=None)
+    gap_thinking = run.add_mutually_exclusive_group()
+    gap_thinking.add_argument(
+        "--gap-thinking",
+        dest="gap_thinking",
+        action="store_true",
+        help="Enable DeepSeek thinking for inference Gap analysis; default for DeepSeek",
+    )
+    gap_thinking.add_argument(
+        "--no-gap-thinking",
+        dest="gap_thinking",
+        action="store_false",
+        help="Disable DeepSeek thinking for inference Gap analysis",
+    )
+    run.set_defaults(gap_thinking=None)
     run.add_argument("--force", action="store_true")
 
     validate_run = sub.add_parser(
         "validate-run",
         help=(
-            "Validate the complete Phase 7.5 run and all nested decomposition, "
-            "Phase 07 analysis, and statement bundle artifacts"
+            "Validate the complete run and all nested decomposition, Claim analysis, "
+            "statement bundle, Gap analysis, and presentation artifacts"
         ),
     )
     _root(validate_run)
@@ -302,10 +333,15 @@ def main() -> None:
             decomposition_max_tokens=args.decomposition_max_tokens,
             request_batch_size=args.request_batch_size,
             max_tokens=args.max_tokens,
+            gap_max_tokens=args.gap_max_tokens,
+            language=args.language,
+            translation_max_tokens=args.translation_max_tokens,
+            translation_request_batch_size=args.translation_request_batch_size,
             timeout_seconds=args.timeout_seconds,
             max_retries=args.max_retries,
             decomposition_thinking=args.decomposition_thinking,
             analysis_thinking=args.analysis_thinking,
+            gap_thinking=args.gap_thinking,
             cache_dir=args.cache_dir,
             force=args.force,
         )

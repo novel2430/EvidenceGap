@@ -190,3 +190,25 @@ __all__.extend([
     "run_statement_pipeline",
     "validate_statement_pipeline_artifact",
 ])
+
+from evidencegap.pipeline.inference_gap_analysis import (
+    INFERENCE_GAP_ANALYSIS_CONTRACT_ID,
+    INFERENCE_GAP_ANALYSIS_PROMPT_VERSION,
+    INFERENCE_GAP_ANALYSIS_SCHEMA_VERSION,
+    build_gap_analysis_input,
+    build_inference_gap_analysis_bundle,
+    run_inference_gap_analysis,
+    validate_inference_gap_analysis_artifact,
+    validate_inference_gap_analysis_bundle,
+)
+
+__all__.extend([
+    "INFERENCE_GAP_ANALYSIS_CONTRACT_ID",
+    "INFERENCE_GAP_ANALYSIS_PROMPT_VERSION",
+    "INFERENCE_GAP_ANALYSIS_SCHEMA_VERSION",
+    "build_gap_analysis_input",
+    "build_inference_gap_analysis_bundle",
+    "run_inference_gap_analysis",
+    "validate_inference_gap_analysis_artifact",
+    "validate_inference_gap_analysis_bundle",
+])
