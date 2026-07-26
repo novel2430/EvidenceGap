@@ -4,10 +4,16 @@ import type { GraphSelection } from '../utils/presentation'
 interface ClaimListProps {
   claims: PresentationClaim[]
   selection: GraphSelection | null
+  activeClaimId?: string | null
   onSelect: (selection: GraphSelection) => void
 }
 
-export function ClaimList({ claims, selection, onSelect }: ClaimListProps) {
+export function ClaimList({
+  claims,
+  selection,
+  activeClaimId,
+  onSelect,
+}: ClaimListProps) {
   return (
     <section className="claim-list-section">
       <div className="inspector-section-heading">
@@ -17,7 +23,8 @@ export function ClaimList({ claims, selection, onSelect }: ClaimListProps) {
       <div className="claim-list">
         {claims.map((claim, index) => {
           const isSelected =
-            selection?.kind === 'claim' && selection.claimId === claim.claim_id
+            activeClaimId === claim.claim_id ||
+            (selection?.kind === 'claim' && selection.claimId === claim.claim_id)
           return (
             <button
               className={`claim-list-item${isSelected ? ' is-selected' : ''}`}

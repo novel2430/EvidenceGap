@@ -23,6 +23,7 @@ import type {
   GraphSelection,
   PresentationIndexes,
 } from '../utils/presentation'
+import { getSelectionClaimId } from '../utils/presentation'
 import { ClaimNode } from './ClaimNode'
 import { InferenceNode } from './InferenceNode'
 
@@ -115,16 +116,20 @@ export function ClaimGraph({
 
   useEffect(() => {
     if (!flowInstance || !selection) return
-    const nodeId = selection.kind === 'claim'
-      ? claimGraphNodeId(selection.claimId)
-      : inferenceGraphNodeId(selection.inferenceStepId)
+    const selectionClaimId = getSelectionClaimId(selection, indexes)
+    const nodeId = selectionClaimId
+      ? claimGraphNodeId(selectionClaimId)
+      : selection.kind === 'inference_step' || selection.kind === 'gap'
+        ? inferenceGraphNodeId(selection.inferenceStepId)
+        : null
+    if (!nodeId) return
     void flowInstance.fitView({
       nodes: [{ id: nodeId }],
       padding: 0.7,
       maxZoom: 1.15,
       duration: 350,
     })
-  }, [flowInstance, selection])
+  }, [flowInstance, indexes, selection])
 
   const visualState = useMemo(() => {
     const modeNodeIds = new Set<string>()
@@ -164,10 +169,11 @@ export function ClaimGraph({
       }
     }
 
-    if (presentation && selection?.kind === 'claim') {
-      const claimNodeId = claimGraphNodeId(selection.claimId)
+    const selectionClaimId = getSelectionClaimId(selection, indexes)
+    if (presentation && selectionClaimId) {
+      const claimNodeId = claimGraphNodeId(selectionClaimId)
       selectionNodeIds.add(claimNodeId)
-      for (const inferenceStep of indexes.inferenceStepsByClaimId.get(selection.claimId) ?? []) {
+      for (const inferenceStep of indexes.inferenceStepsByClaimId.get(selectionClaimId) ?? []) {
         selectionNodeIds.add(inferenceGraphNodeId(inferenceStep.inference_step_id))
       }
       for (const edge of baseEdges) {

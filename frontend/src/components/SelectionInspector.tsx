@@ -7,9 +7,12 @@ import type {
   GraphSelection,
   PresentationIndexes,
 } from '../utils/presentation'
+import { ArticleInspector } from './ArticleInspector'
+import { ClaimArticleList } from './ClaimArticleList'
 import { EvidenceBalance } from './EvidenceBalance'
 
 interface SelectionInspectorProps {
+  runId: string
   selection: GraphSelection | null
   indexes: PresentationIndexes
   onSelect: (selection: GraphSelection) => void
@@ -89,9 +92,13 @@ function ImpactDetails({
 function ClaimDetails({
   claim,
   indexes,
+  selection,
+  onSelect,
 }: {
   claim: PresentationClaim
   indexes: PresentationIndexes
+  selection: GraphSelection
+  onSelect: (selection: GraphSelection) => void
 }) {
   return (
     <section className="selection-card">
@@ -112,6 +119,13 @@ function ClaimDetails({
       <EvidenceBalance
         claim={claim}
         articles={indexes.articlesByClaimId.get(claim.claim_id) ?? []}
+      />
+      <ClaimArticleList
+        key={claim.claim_id}
+        claim={claim}
+        indexes={indexes}
+        selection={selection}
+        onSelect={onSelect}
       />
     </section>
   )
@@ -179,6 +193,7 @@ function InferenceDetails({
 }
 
 export function SelectionInspector({
+  runId,
   selection,
   indexes,
   onSelect,
@@ -189,7 +204,7 @@ export function SelectionInspector({
         <MousePointer2 size={18} />
         <div>
           <strong>Select an analysis element</strong>
-          <p>Choose highlighted statement text, a Claim, an Inference Step, or a Gap.</p>
+          <p>Choose highlighted statement text, a Claim, an Inference Step, a Gap, an Article, or Evidence.</p>
         </div>
       </div>
     )
@@ -197,7 +212,25 @@ export function SelectionInspector({
 
   if (selection.kind === 'claim') {
     const claim = indexes.claimsById.get(selection.claimId)
-    return claim ? <ClaimDetails claim={claim} indexes={indexes} /> : null
+    return claim ? (
+      <ClaimDetails
+        claim={claim}
+        indexes={indexes}
+        selection={selection}
+        onSelect={onSelect}
+      />
+    ) : null
+  }
+
+  if (selection.kind === 'article' || selection.kind === 'evidence') {
+    return (
+      <ArticleInspector
+        runId={runId}
+        selection={selection}
+        indexes={indexes}
+        onSelect={onSelect}
+      />
+    )
   }
 
   const inferenceStep = indexes.inferenceStepsById.get(selection.inferenceStepId)

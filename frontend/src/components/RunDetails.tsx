@@ -5,6 +5,7 @@ import type {
   GraphSelection,
   PresentationIndexes,
 } from '../utils/presentation'
+import { getSelectionClaimId } from '../utils/presentation'
 import { ClaimList } from './ClaimList'
 import { ExportActions } from './ExportActions'
 import { RunErrorPanel } from './RunErrorPanel'
@@ -30,6 +31,8 @@ export function RunDetails({
   selection,
   onSelectionChange,
 }: RunDetailsProps) {
+  const activeClaimId = getSelectionClaimId(selection, indexes)
+
   if (!run) {
     return (
       <aside className="run-details panel">
@@ -70,15 +73,18 @@ export function RunDetails({
               originalText={run.result.statement.original_text}
               claims={run.result.claims}
               selection={selection}
+              activeClaimId={activeClaimId}
               onSelect={onSelectionChange}
             />
           </section>
           <ClaimList
             claims={run.result.claims}
             selection={selection}
+            activeClaimId={activeClaimId}
             onSelect={onSelectionChange}
           />
           <SelectionInspector
+            runId={run.run_id}
             selection={selection}
             indexes={indexes}
             onSelect={onSelectionChange}
