@@ -1,5 +1,9 @@
 import { Activity, CalendarDays, Clock, FileText, Languages } from 'lucide-react'
-import type { RunStatusResponse } from '../contracts'
+import type {
+  LocalizationStatusResponse,
+  PresentationBundle,
+  RunStatusResponse,
+} from '../contracts'
 import { formatCreatedAt, formatDuration } from '../utils/format'
 import type {
   GraphSelection,
@@ -7,7 +11,9 @@ import type {
 } from '../utils/presentation'
 import { getSelectionClaimId } from '../utils/presentation'
 import { ClaimList } from './ClaimList'
+import { ExpertView } from './ExpertView'
 import { ExportActions } from './ExportActions'
+import { LocalizationPanel } from './LocalizationPanel'
 import { RunErrorPanel } from './RunErrorPanel'
 import { RunProgress } from './RunProgress'
 import { SelectionInspector } from './SelectionInspector'
@@ -15,6 +21,19 @@ import { StatementClaimHighlighter } from './StatementClaimHighlighter'
 
 interface RunDetailsProps {
   run: RunStatusResponse | null
+  sourcePresentation: PresentationBundle | null
+  activePresentation: PresentationBundle | null
+  localizationList: LocalizationStatusResponse[]
+  selectedLocalizationId: string | null
+  activeLocalizationId: string | null
+  selectedLocalization: LocalizationStatusResponse | null
+  isLocalizationListLoading: boolean
+  localizationListErrorMessage: string | null
+  selectedLocalizationLoadErrorMessage: string | null
+  localizationSelectionNotice: string | null
+  onRetryLocalizationList: () => void
+  onRetrySelectedLocalization: () => void
+  onSelectLocalization: (localizationId: string | null) => void
   indexes: PresentationIndexes
   selection: GraphSelection | null
   onSelectionChange: (selection: GraphSelection | null) => void
@@ -27,6 +46,19 @@ function executionSeconds(run: RunStatusResponse): number | null {
 
 export function RunDetails({
   run,
+  sourcePresentation,
+  activePresentation,
+  localizationList,
+  selectedLocalizationId,
+  activeLocalizationId,
+  selectedLocalization,
+  isLocalizationListLoading,
+  localizationListErrorMessage,
+  selectedLocalizationLoadErrorMessage,
+  localizationSelectionNotice,
+  onRetryLocalizationList,
+  onRetrySelectedLocalization,
+  onSelectLocalization,
   indexes,
   selection,
   onSelectionChange,
@@ -58,27 +90,42 @@ export function RunDetails({
 
       <dl className="run-metadata">
         <div><dt><CalendarDays size={14} /> Created</dt><dd>{formatCreatedAt(run.created_at)}</dd></div>
-        <div><dt><Languages size={14} /> Output</dt><dd>{run.language}</dd></div>
+        <div><dt><Languages size={14} /> Output</dt><dd>{activePresentation?.output_language ?? run.language}</dd></div>
         <div><dt><Clock size={14} /> Execution</dt><dd>{formatDuration(executionSeconds(run))}</dd></div>
       </dl>
 
       <RunProgress run={run} />
       {run.status === 'failed' && <RunErrorPanel run={run} />}
 
-      {run.status === 'succeeded' && run.result && (
+      {run.status === 'succeeded' && sourcePresentation && activePresentation && (
         <>
+          <LocalizationPanel
+            runId={run.run_id}
+            originalLanguage={sourcePresentation.output_language}
+            localizations={localizationList}
+            selectedLocalizationId={selectedLocalizationId}
+            activeLocalizationId={activeLocalizationId}
+            selectedLocalization={selectedLocalization}
+            isListLoading={isLocalizationListLoading}
+            listErrorMessage={localizationListErrorMessage}
+            selectedLoadErrorMessage={selectedLocalizationLoadErrorMessage}
+            selectionNotice={localizationSelectionNotice}
+            onRetryList={onRetryLocalizationList}
+            onRetrySelected={onRetrySelectedLocalization}
+            onSelectLocalization={onSelectLocalization}
+          />
           <section className="statement-section">
             <h3>Original Statement</h3>
             <StatementClaimHighlighter
-              originalText={run.result.statement.original_text}
-              claims={run.result.claims}
+              originalText={sourcePresentation.statement.original_text}
+              claims={sourcePresentation.claims}
               selection={selection}
               activeClaimId={activeClaimId}
               onSelect={onSelectionChange}
             />
           </section>
           <ClaimList
-            claims={run.result.claims}
+            claims={activePresentation.claims}
             selection={selection}
             activeClaimId={activeClaimId}
             onSelect={onSelectionChange}
@@ -89,7 +136,17 @@ export function RunDetails({
             indexes={indexes}
             onSelect={onSelectionChange}
           />
-          <ExportActions runId={run.run_id} />
+          <ExpertView
+            run={run}
+            presentation={activePresentation}
+            selectedLocalization={selectedLocalization}
+            selection={selection}
+            indexes={indexes}
+          />
+          <ExportActions
+            runId={run.run_id}
+            isLocalizedView={Boolean(activeLocalizationId)}
+          />
           <section className="method-boundary">
             <h3>Methodological Boundary</h3>
             <p>Only summarizes the retrieved Top Articles.</p>

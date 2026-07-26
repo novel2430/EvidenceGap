@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, LoaderCircle, RefreshCw } from 'lucide-react'
-import { Navigate, Route, Routes, useParams } from 'react-router'
+import {
+  Navigate,
+  Route,
+  Routes,
+  useParams,
+  useSearchParams,
+} from 'react-router'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import './App.css'
 import { evidenceGapApi, EvidenceGapApiError } from './api'
@@ -12,15 +18,21 @@ import { Header } from './components/Header'
 import { RunDetails } from './components/RunDetails'
 import { RunHistoryDrawer } from './components/RunHistoryDrawer'
 import { useRunQuery } from './hooks/useRunQuery'
+import {
+  useLocalizationList,
+  useLocalizationQuery,
+} from './hooks/useLocalizations'
 import { getApiErrorMessage } from './utils/format'
 import {
   buildPresentationIndexes,
+  getSelectionClaimId,
   isSelectionValid,
   type GraphSelection,
 } from './utils/presentation'
 
 function Workspace() {
   const { runId } = useParams<{ runId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [selection, setSelection] = useState<GraphSelection | null>(null)
   const closeHistory = useCallback(() => setIsHistoryOpen(false), [])
@@ -36,11 +48,51 @@ function Workspace() {
   const runQuery = useRunQuery(runId)
   const run = runQuery.data ?? null
   const runStatus = run?.status
-  const presentation =
+  const sourcePresentation =
     run?.status === 'succeeded' ? run.result : null
+  const selectedLocalizationId =
+    searchParams.get('localization')?.trim() || null
+  const localizationListQuery = useLocalizationList(
+    runId,
+    Boolean(sourcePresentation),
+  )
+  const selectedLocalizationQuery = useLocalizationQuery(
+    runId,
+    selectedLocalizationId,
+    Boolean(sourcePresentation),
+  )
+  const selectedLocalizationData = selectedLocalizationQuery.data
+  const selectedLocalization =
+    selectedLocalizationData &&
+    selectedLocalizationData.source_run_id === runId
+      ? selectedLocalizationData
+      : null
+  const activeLocalization =
+    selectedLocalization?.status === 'succeeded' &&
+    selectedLocalization.result
+      ? selectedLocalization
+      : null
+  const activePresentation =
+    activeLocalization?.result ?? sourcePresentation
+  const sourcePresentationIndexes = useMemo(
+    () => buildPresentationIndexes(sourcePresentation),
+    [sourcePresentation],
+  )
   const presentationIndexes = useMemo(
-    () => buildPresentationIndexes(presentation),
-    [presentation],
+    () => buildPresentationIndexes(activePresentation),
+    [activePresentation],
+  )
+  const handleSelectLocalization = useCallback(
+    (localizationId: string | null) => {
+      const nextSearchParams = new URLSearchParams(searchParams)
+      if (localizationId) {
+        nextSearchParams.set('localization', localizationId)
+      } else {
+        nextSearchParams.delete('localization')
+      }
+      setSearchParams(nextSearchParams)
+    },
+    [searchParams, setSearchParams],
   )
 
   useEffect(() => {
@@ -53,13 +105,66 @@ function Workspace() {
   }, [runId])
 
   useEffect(() => {
-    if (selection && !isSelectionValid(selection, presentationIndexes)) {
-      setSelection(null)
+    if (!selection || isSelectionValid(selection, presentationIndexes)) return
+
+    if (selection.kind === 'gap') {
+      const inferenceStep = presentationIndexes.inferenceStepsById.get(
+        selection.inferenceStepId,
+      )
+      setSelection(
+        inferenceStep
+          ? {
+              kind: 'inference_step',
+              inferenceStepId: inferenceStep.inference_step_id,
+            }
+          : null,
+      )
+      return
     }
-  }, [presentationIndexes, selection])
+
+    if (selection.kind === 'article' || selection.kind === 'evidence') {
+      const sourceClaimId = getSelectionClaimId(
+        selection,
+        sourcePresentationIndexes,
+      )
+      setSelection(
+        sourceClaimId && presentationIndexes.claimsById.has(sourceClaimId)
+          ? { kind: 'claim', claimId: sourceClaimId }
+          : null,
+      )
+      return
+    }
+
+    setSelection(null)
+  }, [
+    presentationIndexes,
+    selection,
+    sourcePresentationIndexes,
+  ])
+
+  useEffect(() => {
+    const localizationStatus = selectedLocalization?.status
+    if (
+      !runId ||
+      (localizationStatus !== 'succeeded' && localizationStatus !== 'failed')
+    ) {
+      return
+    }
+    void queryClient.invalidateQueries({
+      queryKey: ['localizations', runId],
+    })
+  }, [queryClient, runId, selectedLocalization?.status])
 
   const runLoadError = runQuery.isError ? getApiErrorMessage(runQuery.error) : null
   const isNotFound = runQuery.error instanceof EvidenceGapApiError && runQuery.error.status === 404
+  const localizationSelectionNotice =
+    selectedLocalizationQuery.isSuccess &&
+    selectedLocalizationQuery.data.source_run_id !== runId
+      ? 'The requested localization does not belong to this Run.'
+      : selectedLocalization?.status === 'succeeded' &&
+          !selectedLocalization.result
+        ? 'The requested localization completed without a presentation result.'
+        : null
 
   return (
     <main className="workbench-shell">
@@ -102,7 +207,7 @@ function Workspace() {
                     {!runQuery.isLoading && !runLoadError && (
                       <ClaimGraph
                         key={runId ?? 'no-run'}
-                        presentation={presentation}
+                        presentation={activePresentation}
                         indexes={presentationIndexes}
                         selection={selection}
                         onSelectionChange={handleSelectionChange}
@@ -117,6 +222,29 @@ function Workspace() {
                   <div className="split-panel-content">
                     <RunDetails
                       run={run}
+                      sourcePresentation={sourcePresentation}
+                      activePresentation={activePresentation}
+                      localizationList={localizationListQuery.data?.localizations ?? []}
+                      selectedLocalizationId={selectedLocalizationId}
+                      activeLocalizationId={activeLocalization?.localization_id ?? null}
+                      selectedLocalization={selectedLocalization}
+                      isLocalizationListLoading={localizationListQuery.isLoading}
+                      localizationListErrorMessage={
+                        localizationListQuery.isError
+                          ? getApiErrorMessage(localizationListQuery.error)
+                          : null
+                      }
+                      selectedLocalizationLoadErrorMessage={
+                        selectedLocalizationQuery.isError
+                          ? getApiErrorMessage(selectedLocalizationQuery.error)
+                          : null
+                      }
+                      localizationSelectionNotice={localizationSelectionNotice}
+                      onRetryLocalizationList={() =>
+                        void localizationListQuery.refetch()}
+                      onRetrySelectedLocalization={() =>
+                        void selectedLocalizationQuery.refetch()}
+                      onSelectLocalization={handleSelectLocalization}
                       indexes={presentationIndexes}
                       selection={selection}
                       onSelectionChange={handleSelectionChange}
@@ -132,8 +260,8 @@ function Workspace() {
           <Panel id="analysis-summary" defaultSize="26%" minSize="175px" maxSize="44%">
             <div className="split-panel-content">
               <AnalysisSummary
-                summary={run?.status === 'succeeded' ? run.result?.summary ?? null : null}
-                analysisContext={run?.status === 'succeeded' ? run.result?.analysis_context ?? null : null}
+                summary={activePresentation?.summary ?? null}
+                analysisContext={activePresentation?.analysis_context ?? null}
               />
             </div>
           </Panel>

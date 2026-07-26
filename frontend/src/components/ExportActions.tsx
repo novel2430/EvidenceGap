@@ -5,6 +5,7 @@ import { getApiErrorMessage } from '../utils/format'
 
 interface ExportActionsProps {
   runId: string
+  isLocalizedView?: boolean
 }
 
 function saveBlob(blob: Blob, filename: string) {
@@ -18,7 +19,10 @@ function saveBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(objectUrl)
 }
 
-export function ExportActions({ runId }: ExportActionsProps) {
+export function ExportActions({
+  runId,
+  isLocalizedView = false,
+}: ExportActionsProps) {
   const [pendingAction, setPendingAction] = useState<'json' | 'markdown' | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const resetTimer = useRef<number | null>(null)
@@ -71,6 +75,11 @@ export function ExportActions({ runId }: ExportActionsProps) {
   return (
     <section className="export-actions">
       <h3>Export &amp; share</h3>
+      {isLocalizedView && (
+        <p className="export-boundary">
+          Downloads export the Original Analysis. The backend does not provide localized export endpoints.
+        </p>
+      )}
       <div className="export-buttons">
         <button type="button" onClick={downloadJson} disabled={pendingAction !== null}>
           <Download size={14} /> {pendingAction === 'json' ? 'Downloading…' : 'Download JSON'}
