@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evidencegap-backend"
+version = "0.4.1"
+description = "Independent EvidenceGap 07.7 analysis runtime"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26,<3",
+  "scipy>=1.11",
+  "pyarrow>=16,<22",
+  "duckdb>=1.0,<2",
+  "bm25s[core]>=0.2.0",
+  "faiss-cpu>=1.8,<2",
+  "transformers>=4.44,<6",
+  "safetensors>=0.4",
+  "stanza==1.14.0",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.30,<1",
+]
+
+[project.optional-dependencies]
+test = [
+  "httpx>=0.27,<1",
+  "pytest>=8,<10",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["evidencegap_backend*"]
+
+[tool.setuptools.package-data]
+evidencegap_backend = ["prompts/*.txt"]

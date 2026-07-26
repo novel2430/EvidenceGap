@@ -1,0 +1,15 @@
+numpy<3,>=1.26
+scipy>=1.11
+pyarrow<22,>=16
+duckdb<2,>=1.0
+bm25s[core]>=0.2.0
+faiss-cpu<2,>=1.8
+transformers<6,>=4.44
+safetensors>=0.4
+stanza==1.14.0
+fastapi<1,>=0.115
+uvicorn<1,>=0.30
+
+[test]
+httpx<1,>=0.27
+pytest<10,>=8

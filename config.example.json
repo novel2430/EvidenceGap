@@ -1,0 +1,99 @@
+{
+  "config_version": 1,
+  "workspace_root": ".",
+  "runtime": {
+    "device": "cuda:0",
+    "amp": "fp16",
+    "allow_cpu_fallback": false,
+    "article_cache_size": 5000,
+    "stanza_batch_size": 32,
+    "cross_encoder_batch_size": 16,
+    "section_mode": "auto"
+  },
+  "resources": {
+    "artifact_root": "artifacts/v1/pipeline/statement_run",
+    "corpus_dir": "artifacts/v1/article_corpus",
+    "article_input_dir": "artifacts/v1/dense/article_inputs",
+    "bm25_index_dir": "artifacts/v1/bm25_index",
+    "medcpt_index_dir": "artifacts/v1/dense/medcpt/faiss_index",
+    "bmretriever_index_dir": "artifacts/v1/dense/bmretriever/faiss_index",
+    "cross_encoder_model_dir": "models/v1/medcpt-cross",
+    "stanza_model_dir": "models/v1/stanza",
+    "stanza_package": "genia",
+    "cache_dir": "artifacts/v1/stance_verification/article_evidence_cache"
+  },
+  "llm": {
+    "defaults": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-flash",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "timeout_seconds": 180,
+      "max_retries": 4
+    },
+    "stages": {
+      "statement_decomposition": {
+        "model": "deepseek-v4-flash",
+        "max_tokens": 2048,
+        "thinking": true,
+        "prompt": {
+          "system_file": "config/prompts/statement_decomposition.txt",
+          "version": "statement-decomposition-custom-v1"
+        }
+      },
+      "article_evidence": {
+        "model": "deepseek-v4-flash",
+        "max_tokens": 8192,
+        "request_batch_size": 1,
+        "thinking": true,
+        "prompt": {
+          "system_file": "config/prompts/article_evidence.txt",
+          "version": "article-evidence-custom-v1"
+        }
+      },
+      "inference_gap": {
+        "model": "deepseek-v4-flash",
+        "max_tokens": 4096,
+        "thinking": true,
+        "prompt": {
+          "system_file": "config/prompts/localization.txt",
+          "version": "localization-custom-v1"
+        }
+      },
+      "localization": {
+        "model": "deepseek-v4-flash",
+        "max_tokens": 8192,
+        "request_batch_size": 32,
+        "thinking": false,
+        "prompt": {
+          "system_file": "config/prompts/localization.txt",
+          "version": "localization-custom-v1"
+        }
+      }
+    }
+  },
+  "pipeline": {
+    "retrieval": {
+      "source_depth": 100,
+      "dense_nprobe": 1024,
+      "rrf_k": 60,
+      "rerank_depth": 100,
+      "final_article_top_k": 10
+    },
+    "article_evidence": {
+      "max_evidence_sentences": 5
+    }
+  },
+  "output": {
+    "default_language": "English"
+  },
+  "api": {
+    "run_store_root": "artifacts/v1/api_runs",
+    "max_queue_size": 16,
+    "max_statement_chars": 20000,
+    "validate_resources": true,
+    "cors_origins": [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173"
+    ]
+  }
+}

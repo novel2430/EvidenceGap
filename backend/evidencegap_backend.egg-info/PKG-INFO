@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: evidencegap-backend
+Version: 0.3.0
+Summary: Independent EvidenceGap 07.7 analysis runtime
+Requires-Python: >=3.11
+Requires-Dist: numpy<3,>=1.26
+Requires-Dist: scipy>=1.11
+Requires-Dist: pyarrow<22,>=16
+Requires-Dist: duckdb<2,>=1.0
+Requires-Dist: bm25s[core]>=0.2.0
+Requires-Dist: faiss-cpu<2,>=1.8
+Requires-Dist: transformers<6,>=4.44
+Requires-Dist: safetensors>=0.4
+Requires-Dist: stanza==1.14.0
+Requires-Dist: fastapi<1,>=0.115
+Requires-Dist: uvicorn<1,>=0.30
+Provides-Extra: test
+Requires-Dist: httpx<1,>=0.27; extra == "test"
+Requires-Dist: pytest<10,>=8; extra == "test"
