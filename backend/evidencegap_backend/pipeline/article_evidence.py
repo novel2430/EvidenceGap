@@ -38,11 +38,115 @@ from evidencegap_backend.stance.llm_judge import (
     call_structured_llm,
 )
 
-ARTICLE_EVIDENCE_SCHEMA_VERSION = "1.0.0"
+ARTICLE_EVIDENCE_SCHEMA_VERSION = "1.1.0"
 ARTICLE_EVIDENCE_CONTRACT_ID = "phase07.article-evidence.v1"
 ARTICLE_EVIDENCE_PROMPT_VERSION = "phase07_article_evidence_v3"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/pipeline/article_evidence")
 DEFAULT_CACHE_ROOT = Path("artifacts/v1/stance_verification/article_evidence_cache")
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise EvidenceGapError("Rank provenance cannot be boolean")
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError) as exc:
+        raise EvidenceGapError("Rank provenance must be numeric") from exc
+    if not math.isfinite(numeric):
+        return None
+    if not numeric.is_integer():
+        raise EvidenceGapError("Rank provenance must be an integer")
+    result = int(numeric)
+    return result if result > 0 else None
+
+
+def _optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise EvidenceGapError("Score provenance cannot be boolean")
+    try:
+        result = float(value)
+    except (TypeError, ValueError) as exc:
+        raise EvidenceGapError("Score provenance must be numeric") from exc
+    return result if math.isfinite(result) else None
+
+
+def build_retrieval_trace(article: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize all existing retrieval/reranking provenance for one article."""
+
+    final_rank = _optional_int(article.get("final_article_rank"))
+    fusion_rank = _optional_int(article.get("fusion_rank"))
+    rrf_score = _optional_float(article.get("rrf_score"))
+    cross_encoder_score = _optional_float(article.get("cross_encoder_score"))
+    if final_rank is None or fusion_rank is None or rrf_score is None:
+        raise EvidenceGapError("Top Article is missing required retrieval provenance")
+    if cross_encoder_score is None:
+        raise EvidenceGapError("Top Article is missing cross-encoder provenance")
+    trace = {
+        "bm25": {
+            "rank": _optional_int(article.get("bm25_rank")),
+            "score": _optional_float(article.get("bm25_score")),
+        },
+        "medcpt": {
+            "rank": _optional_int(article.get("medcpt_rank")),
+            "score": _optional_float(article.get("medcpt_score")),
+        },
+        "bmretriever": {
+            "rank": _optional_int(article.get("bmretriever_rank")),
+            "score": _optional_float(article.get("bmretriever_score")),
+        },
+        "fusion": {"rank": fusion_rank, "rrf_score": rrf_score},
+        "cross_encoder": {"score": cross_encoder_score},
+        "final_article_rank": final_rank,
+    }
+    validate_retrieval_trace(trace)
+    return trace
+
+
+def validate_retrieval_trace(value: Mapping[str, Any]) -> dict[str, Any]:
+    if set(value) != {
+        "bm25",
+        "medcpt",
+        "bmretriever",
+        "fusion",
+        "cross_encoder",
+        "final_article_rank",
+    }:
+        raise EvidenceGapError("Invalid retrieval trace fields")
+    for method in ("bm25", "medcpt", "bmretriever"):
+        record = value.get(method)
+        if not isinstance(record, Mapping) or set(record) != {"rank", "score"}:
+            raise EvidenceGapError(f"Invalid {method} retrieval trace")
+        rank = record.get("rank")
+        score = record.get("score")
+        normalized_rank = _optional_int(rank)
+        normalized_score = _optional_float(score)
+        if rank is not None and normalized_rank is None:
+            raise EvidenceGapError(f"Invalid {method} rank")
+        if score is not None and normalized_score is None:
+            raise EvidenceGapError(f"Invalid {method} score")
+        if (rank is None) != (score is None):
+            raise EvidenceGapError(f"Incomplete {method} retrieval trace")
+    fusion = value.get("fusion")
+    cross_encoder = value.get("cross_encoder")
+    if not isinstance(fusion, Mapping) or set(fusion) != {"rank", "rrf_score"}:
+        raise EvidenceGapError("Invalid fusion retrieval trace")
+    if _optional_int(fusion.get("rank")) is None or _optional_float(
+        fusion.get("rrf_score")
+    ) is None:
+        raise EvidenceGapError("Invalid fusion retrieval trace")
+    if not isinstance(cross_encoder, Mapping) or set(cross_encoder) != {"score"}:
+        raise EvidenceGapError("Invalid cross-encoder retrieval trace")
+    if _optional_float(cross_encoder.get("score")) is None:
+        raise EvidenceGapError("Invalid cross-encoder retrieval trace")
+    if _optional_int(value.get("final_article_rank")) is None:
+        raise EvidenceGapError("Invalid final article rank in retrieval trace")
+    return dict(value)
+
+
 MAX_EVIDENCE_SENTENCES = 5
 
 
@@ -637,6 +741,7 @@ def _output_row(
         "article_id": item.article_id,
         "pmid": None if item.article.get("pmid") is None else str(item.article["pmid"]),
         "final_article_rank": int(item.article["final_article_rank"]),
+        "retrieval_trace": build_retrieval_trace(item.article),
         "title": str(item.article.get("title") or ""),
         "predicted_label": label,
         "probabilities": probabilities,
@@ -668,6 +773,10 @@ def validate_article_evidence_rows(
     label_counts = {label: 0 for label in STANCE_LABELS}
     for row in rows:
         article_id = str(row["article_id"])
+        expected_trace = build_retrieval_trace(source_by_article[article_id].article)
+        trace = row.get("retrieval_trace")
+        if not isinstance(trace, Mapping) or dict(trace) != expected_trace:
+            raise EvidenceGapError(f"Retrieval trace mismatch for {article_id}")
         label = canonical_stance_label(str(row["predicted_label"]))
         label_counts[label] += 1
         probabilities = {key: float(value) for key, value in row["probabilities"].items()}

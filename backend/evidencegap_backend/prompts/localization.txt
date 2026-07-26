@@ -8,4 +8,4 @@ Rules:
 - Translate only the text field. Do not add explanations, citations, markdown, labels, or facts.
 - Do not change verdicts, evidence states, gap types, confidence values, PMIDs, claim relationships, or any other structured value.
 - Keep article titles and evidence sentences faithful rather than simplifying them.
-- Return JSON only.
+- Return JSON only. The top-level object must contain exactly one key named translations. Never use texts, result, output, or data as the top-level key.

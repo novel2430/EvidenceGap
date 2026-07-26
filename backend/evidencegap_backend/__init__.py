@@ -5,7 +5,11 @@ from evidencegap_backend.config import (
     LLMStageConfig,
     PipelineConfig,
 )
-from evidencegap_backend.engine import EvidenceGapEngine, StatementAnalysisResult
+from evidencegap_backend.engine import (
+    EvidenceGapEngine,
+    LocalizationResult,
+    StatementAnalysisResult,
+)
 from evidencegap_backend.resources import RuntimeResources
 from evidencegap_backend.common import EvidenceGapError
 
@@ -16,5 +20,6 @@ __all__ = [
     "PipelineConfig",
     "EvidenceGapError",
     "RuntimeResources",
+    "LocalizationResult",
     "StatementAnalysisResult",
 ]

@@ -6,10 +6,11 @@ import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Callable, Mapping, Protocol
 
 from evidencegap_backend.common import EvidenceGapError
-from evidencegap_backend.engine import StatementAnalysisResult
+from evidencegap_backend.engine import LocalizationResult, StatementAnalysisResult
+from evidencegap_backend.output.report import render_markdown_report
 from evidencegap_backend.api.run_store import JsonRunStore
 
 LOGGER = logging.getLogger(__name__)
@@ -39,7 +40,26 @@ class EngineProtocol(Protocol):
         language: str | None = None,
         force: bool = False,
         validate: bool = True,
+        progress_callback: Callable[[Mapping[str, Any]], None] | None = None,
     ) -> StatementAnalysisResult: ...
+
+    def get_article_context(
+        self,
+        *,
+        presentation_bundle: Mapping[str, Any],
+        article_node_id: str,
+    ) -> dict[str, Any]: ...
+
+    def localize_statement_run(
+        self,
+        *,
+        artifact_dir: Path,
+        localization_name: str,
+        language: str,
+        artifact_root: Path,
+        force: bool = False,
+        validate: bool = True,
+    ) -> LocalizationResult: ...
 
 
 @dataclass(frozen=True)
@@ -47,6 +67,16 @@ class _RunJob:
     run_id: str
     statement: str
     language: str
+
+
+@dataclass(frozen=True)
+class _LocalizationJob:
+    source_run_id: str
+    localization_id: str
+    language: str
+
+
+Job = _RunJob | _LocalizationJob
 
 
 class RunManager:
@@ -63,7 +93,7 @@ class RunManager:
         self.engine = engine
         self.store = store
         self._validate_resources = validate_resources
-        self._queue: queue.Queue[_RunJob | object] = queue.Queue(
+        self._queue: queue.Queue[Job | object] = queue.Queue(
             maxsize=max_queue_size
         )
         self._thread: threading.Thread | None = None
@@ -109,10 +139,7 @@ class RunManager:
 
     def submit(self, *, statement: str, language: str) -> dict[str, Any]:
         with self._submit_lock:
-            if not self._accepting or not self.worker_alive:
-                raise EvidenceGapError("EvidenceGap API worker is not running")
-            if self._queue.full():
-                raise RunQueueFullError("EvidenceGap API run queue is full")
+            self._ensure_accepting()
             run_id = f"run_{uuid.uuid4().hex}"
             record = self.store.create(
                 run_id=run_id,
@@ -128,8 +155,75 @@ class RunManager:
             )
             return record
 
+    def submit_localization(
+        self,
+        *,
+        run_id: str,
+        language: str,
+    ) -> dict[str, Any]:
+        with self._submit_lock:
+            self._ensure_accepting()
+            localization_id = f"loc_{uuid.uuid4().hex}"
+            record = self.store.create_localization(
+                run_id=run_id,
+                localization_id=localization_id,
+                language=language,
+            )
+            self._queue.put_nowait(
+                _LocalizationJob(
+                    source_run_id=run_id,
+                    localization_id=localization_id,
+                    language=language,
+                )
+            )
+            return record
+
+    def _ensure_accepting(self) -> None:
+        if not self._accepting or not self.worker_alive:
+            raise EvidenceGapError("EvidenceGap API worker is not running")
+        if self._queue.full():
+            raise RunQueueFullError("EvidenceGap API run queue is full")
+
     def get(self, run_id: str) -> dict[str, Any]:
         return self.store.get(run_id)
+
+    def list_runs(self, *, limit: int, cursor: str | None) -> dict[str, Any]:
+        return self.store.list_runs(limit=limit, cursor=cursor)
+
+    def get_article_context(
+        self,
+        *,
+        run_id: str,
+        article_node_id: str,
+    ) -> dict[str, Any]:
+        result = self.store.get_result(run_id)
+        return self.engine.get_article_context(
+            presentation_bundle=result,
+            article_node_id=article_node_id,
+        )
+
+    def export_result(self, run_id: str) -> dict[str, Any]:
+        return self.store.get_result(run_id)
+
+    def export_markdown(self, run_id: str) -> str:
+        result = self.store.get_result(run_id)
+        record = self.store.get_internal(run_id)
+        execution = record.get("execution_summary")
+        return render_markdown_report(
+            result,
+            run_id=run_id,
+            execution_summary=(
+                execution if isinstance(execution, Mapping) else None
+            ),
+        )
+
+    def get_localization(
+        self, run_id: str, localization_id: str
+    ) -> dict[str, Any]:
+        return self.store.get_localization(run_id, localization_id)
+
+    def list_localizations(self, run_id: str) -> dict[str, Any]:
+        return self.store.list_localizations(run_id)
 
     def status(self) -> dict[str, Any]:
         runtime = self.engine.runtime_status
@@ -156,6 +250,15 @@ class RunManager:
                         code="SERVICE_SHUTDOWN",
                         message=(
                             "The API service stopped before this queued run started."
+                        ),
+                    )
+                elif isinstance(queued, _LocalizationJob):
+                    self.store.mark_localization_failed(
+                        queued.source_run_id,
+                        queued.localization_id,
+                        code="SERVICE_SHUTDOWN",
+                        message=(
+                            "The API service stopped before this queued localization started."
                         ),
                     )
                 self._queue.task_done()
@@ -185,8 +288,12 @@ class RunManager:
                 try:
                     if item is _STOP:
                         return
-                    assert isinstance(item, _RunJob)
-                    self._execute(item)
+                    if isinstance(item, _RunJob):
+                        self._execute_run(item)
+                    elif isinstance(item, _LocalizationJob):
+                        self._execute_localization(item)
+                    else:
+                        raise AssertionError("Unexpected EvidenceGap job")
                 finally:
                     self._queue.task_done()
         finally:
@@ -194,10 +301,30 @@ class RunManager:
                 self._active_run_id = None
             self.engine.close()
 
-    def _execute(self, job: _RunJob) -> None:
+    def _execute_run(self, job: _RunJob) -> None:
         with self._state_lock:
             self._active_run_id = job.run_id
         self.store.mark_running(job.run_id)
+
+        def progress(value: Mapping[str, Any]) -> None:
+            self.store.update_progress(
+                job.run_id,
+                stage=str(value["stage"]),
+                stage_index=int(value["stage_index"]),
+                total_stages=int(value["total_stages"]),
+                message=str(value["message"]),
+                completed_units=(
+                    None
+                    if value.get("completed_units") is None
+                    else int(value["completed_units"])
+                ),
+                total_units=(
+                    None
+                    if value.get("total_units") is None
+                    else int(value["total_units"])
+                ),
+            )
+
         try:
             result = self.engine.analyze_statement(
                 statement=job.statement,
@@ -205,6 +332,7 @@ class RunManager:
                 language=job.language,
                 force=False,
                 validate=True,
+                progress_callback=progress,
             )
             self.store.mark_succeeded(
                 job.run_id,
@@ -212,6 +340,11 @@ class RunManager:
                 artifact_dir=Path(result.artifact_dir),
                 presentation_bundle_path=Path(
                     result.presentation_bundle_path
+                ),
+                execution_summary=(
+                    result.run.get("execution_summary")
+                    if isinstance(result.run.get("execution_summary"), Mapping)
+                    else None
                 ),
             )
         except EvidenceGapError as exc:
@@ -227,6 +360,62 @@ class RunManager:
                 job.run_id,
                 code="INTERNAL_ERROR",
                 message="The analysis failed because of an internal error.",
+            )
+        finally:
+            with self._state_lock:
+                self._active_run_id = None
+
+    def _execute_localization(self, job: _LocalizationJob) -> None:
+        with self._state_lock:
+            self._active_run_id = job.source_run_id
+        self.store.mark_localization_running(
+            job.source_run_id, job.localization_id
+        )
+        try:
+            source = self.store.get_internal(job.source_run_id)
+            artifact_value = source.get("artifact_dir")
+            if not isinstance(artifact_value, str) or not artifact_value:
+                raise EvidenceGapError("Source run artifact directory is unavailable")
+            result = self.engine.localize_statement_run(
+                artifact_dir=Path(artifact_value),
+                localization_name=job.localization_id,
+                language=job.language,
+                artifact_root=self.store.localization_artifact_root(
+                    job.source_run_id
+                ),
+                force=False,
+                validate=True,
+            )
+            self.store.mark_localization_succeeded(
+                job.source_run_id,
+                job.localization_id,
+                result=result.presentation_bundle,
+                artifact_dir=result.artifact_dir,
+                presentation_bundle_path=result.presentation_bundle_path,
+            )
+        except EvidenceGapError as exc:
+            LOGGER.exception(
+                "EvidenceGap localization failed: %s/%s",
+                job.source_run_id,
+                job.localization_id,
+            )
+            self.store.mark_localization_failed(
+                job.source_run_id,
+                job.localization_id,
+                code="LOCALIZATION_FAILED",
+                message=str(exc),
+            )
+        except Exception:
+            LOGGER.exception(
+                "Unexpected EvidenceGap localization failure: %s/%s",
+                job.source_run_id,
+                job.localization_id,
+            )
+            self.store.mark_localization_failed(
+                job.source_run_id,
+                job.localization_id,
+                code="INTERNAL_ERROR",
+                message="The localization failed because of an internal error.",
             )
         finally:
             with self._state_lock:

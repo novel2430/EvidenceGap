@@ -123,9 +123,29 @@ Poll the returned `Location`:
 curl http://127.0.0.1:8000/api/v1/runs/<run_id>
 ```
 
-The status is `queued`, `running`, `succeeded`, or `failed`. A succeeded response
-contains the complete presentation bundle in `result`. `/health` reports the
-worker and Engine lifecycle state without exposing model paths.
+The status is `queued`, `running`, `succeeded`, or `failed`. While a run is
+active, the response also reports the current pipeline stage and claim-level
+progress. A succeeded response contains the complete presentation bundle in
+`result`. `/health` reports the worker and Engine lifecycle state without
+exposing model paths.
+
+Phase 8.2 read and delivery endpoints:
+
+```text
+GET  /api/v1/runs?limit=20&cursor=<run_id>
+GET  /api/v1/runs/<run_id>/articles/<article_node_id>
+GET  /api/v1/runs/<run_id>/exports/result.json
+GET  /api/v1/runs/<run_id>/exports/report.md
+POST /api/v1/runs/<run_id>/localizations
+GET  /api/v1/runs/<run_id>/localizations
+GET  /api/v1/runs/<run_id>/localizations/<localization_id>
+```
+
+Article context is rebuilt from the long-lived article store and exact evidence
+offsets are returned only after the source-text fingerprint is verified. Markdown
+reports are rendered deterministically; they do not call an LLM or alter the
+formal verdict. Localization variants reuse the saved statement and inference-gap
+artifacts and never overwrite the source run.
 
 Useful API environment variables:
 

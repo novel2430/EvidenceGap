@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evidencegap-backend"
-version = "0.4.1"
+version = "0.5.0"
 description = "Independent EvidenceGap 07.7 analysis runtime"
 requires-python = ">=3.11"
 dependencies = [

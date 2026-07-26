@@ -18,6 +18,7 @@ from evidencegap_backend.common import (
     sha256_file,
     find_workspace_root,
 )
+from evidencegap_backend.config import validate_analysis_context
 from evidencegap_backend.pipeline.inference_gap_analysis import (
     validate_inference_gap_analysis_artifact,
     validate_inference_gap_analysis_bundle,
@@ -41,9 +42,9 @@ from evidencegap_backend.stance.llm_judge import (
     call_structured_llm,
 )
 
-PRESENTATION_BUNDLE_SCHEMA_VERSION = "1.0.0"
+PRESENTATION_BUNDLE_SCHEMA_VERSION = "1.1.0"
 PRESENTATION_BUNDLE_CONTRACT_ID = "phase077.presentation-bundle.v1"
-LOCALIZATION_PROMPT_VERSION = "phase077_output_localization_v2"
+LOCALIZATION_PROMPT_VERSION = "phase077_output_localization_v3"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/output/presentation")
 
 _VERDICT_TO_EVIDENCE_STATE = {
@@ -209,6 +210,7 @@ def build_presentation_bundle(
         "localized": _needs_translation(language),
         "source_statement_bundle_sha256": statement_bundle_sha256,
         "source_inference_gap_analysis_sha256": gap_bundle_sha256,
+        "analysis_context": copy.deepcopy(dict(statement_bundle["analysis_context"])),
         "statement": statement,
         "claims": claims,
         "inference_steps": steps,
@@ -281,22 +283,83 @@ def build_localization_prompt(
 ) -> str:
     parts = [
         f"TARGET LANGUAGE: {target_language}",
-        "Translate every item and return the same text_id values exactly.",
-        json.dumps({"texts": units}, ensure_ascii=False, indent=2),
+        "Translate every item and copy every text_id exactly.",
+        "Return exactly this JSON shape and no other top-level keys:",
+        json.dumps(
+            {
+                "translations": [
+                    {
+                        "text_id": "COPY_THE_INPUT_TEXT_ID_EXACTLY",
+                        "text": "TRANSLATED_TEXT",
+                    }
+                ]
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        "Do not return a top-level texts, result, output, or data key.",
+        "INPUT TRANSLATION UNITS:",
+        json.dumps({"translation_units": units}, ensure_ascii=False, indent=2),
     ]
     if retry_note:
-        parts.extend(["The previous response was invalid. Fix it:", retry_note])
+        parts.extend(
+            [
+                "The previous response was invalid. Correct only its JSON structure and retry:",
+                retry_note,
+            ]
+        )
     return "\n\n".join(parts)
+
+
+def _translation_rows(payload: Mapping[str, Any]) -> list[Any]:
+    """Extract a safe, semantically equivalent translation-array shape.
+
+    DeepSeek's ``json_object`` mode guarantees a JSON object but does not enforce
+    the supplied JSON Schema. It may mirror the input key (``texts``) or wrap the
+    requested object once. We normalize only these narrow structural variants;
+    the strict text_id coverage and row validation below remain unchanged.
+    """
+
+    current: Mapping[str, Any] = payload
+    for _ in range(2):
+        keys = set(current)
+        if keys == {"translations"}:
+            rows = current["translations"]
+            if not isinstance(rows, list):
+                raise _ProviderError(
+                    "translations must be an array", retryable=True
+                )
+            return rows
+        if keys == {"texts"}:
+            rows = current["texts"]
+            if not isinstance(rows, list):
+                raise _ProviderError("texts must be an array", retryable=True)
+            return rows
+        if len(keys) == 1:
+            wrapper = next(iter(keys))
+            nested = current[wrapper]
+            if wrapper in {"result", "output", "data"} and isinstance(
+                nested, Mapping
+            ):
+                current = nested
+                continue
+        break
+
+    received = sorted(str(key) for key in current)
+    raise _ProviderError(
+        "Response must contain exactly a translations array; "
+        f"received top-level keys: {received}",
+        retryable=True,
+    )
 
 
 def validate_localization_response(
     payload: Mapping[str, Any], expected_units: list[Mapping[str, str]]
 ) -> dict[str, str]:
-    if set(payload) != {"translations"} or not isinstance(payload["translations"], list):
-        raise _ProviderError("Response must contain exactly a translations array", retryable=True)
+    rows = _translation_rows(payload)
     expected_ids = [str(row["text_id"]) for row in expected_units]
     values: dict[str, str] = {}
-    for row in payload["translations"]:
+    for row in rows:
         if not isinstance(row, Mapping) or set(row) != {"text_id", "text"}:
             raise _ProviderError("Each translation needs exactly text_id and text", retryable=True)
         text_id = str(row["text_id"]).strip()
@@ -438,6 +501,12 @@ def validate_presentation_bundle(
     language = str(bundle.get("output_language") or "").strip()
     if not language or bundle.get("localized") != _needs_translation(language):
         raise EvidenceGapError("Invalid presentation language metadata")
+    if bundle.get("analysis_context") != statement_bundle.get("analysis_context"):
+        raise EvidenceGapError("Presentation analysis context changed source data")
+    try:
+        validate_analysis_context(bundle.get("analysis_context") or {})
+    except ValueError as exc:
+        raise EvidenceGapError("Invalid presentation analysis context") from exc
     if _without_added_fields(bundle["statement"], ("display_text",)) != statement_bundle["statement"]:
         raise EvidenceGapError("Presentation statement changed source data")
     if not str(bundle["statement"].get("display_text") or "").strip():

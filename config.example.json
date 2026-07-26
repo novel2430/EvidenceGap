@@ -33,7 +33,7 @@
     "stages": {
       "statement_decomposition": {
         "model": "deepseek-v4-flash",
-        "max_tokens": 2048,
+        "max_tokens": 4096,
         "thinking": true,
         "prompt": {
           "system_file": "config/prompts/statement_decomposition.txt",
@@ -52,10 +52,10 @@
       },
       "inference_gap": {
         "model": "deepseek-v4-flash",
-        "max_tokens": 4096,
+        "max_tokens": 8192,
         "thinking": true,
         "prompt": {
-          "system_file": "config/prompts/localization.txt",
+          "system_file": "config/prompts/inference_gap.txt",
           "version": "localization-custom-v1"
         }
       },

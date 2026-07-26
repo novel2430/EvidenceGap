@@ -16,6 +16,66 @@ DEFAULT_BMRETRIEVER_INDEX_DIR = Path(
 )
 DEFAULT_CROSS_ENCODER_MODEL_DIR = Path("models/v1/medcpt-cross")
 DEFAULT_STANZA_MODEL_DIR = Path("models/v1/stanza")
+ANALYSIS_CONTEXT_SCHEMA_VERSION = "1.0.0"
+
+
+def validate_analysis_context(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate the deterministic methodology boundary exposed to clients."""
+
+    expected_fields = {
+        "schema_version",
+        "scope",
+        "is_systematic_review",
+        "is_clinical_recommendation",
+        "is_final_medical_truth",
+        "aggregation_method",
+        "uses_confidence_weighting",
+        "retrieval_methods",
+        "fusion_method",
+        "reranker",
+        "source_depth",
+        "dense_nprobe",
+        "rrf_k",
+        "rerank_depth",
+        "article_top_k",
+        "max_evidence_sentences_per_article",
+    }
+    if set(value) != expected_fields:
+        raise ValueError("Invalid analysis context fields")
+    expected_literals = {
+        "schema_version": ANALYSIS_CONTEXT_SCHEMA_VERSION,
+        "scope": "retrieved_top_articles",
+        "is_systematic_review": False,
+        "is_clinical_recommendation": False,
+        "is_final_medical_truth": False,
+        "aggregation_method": "deterministic_article_count",
+        "uses_confidence_weighting": False,
+        "fusion_method": "reciprocal_rank_fusion",
+        "reranker": "MedCPT Cross-Encoder",
+    }
+    if any(value.get(key) != expected for key, expected in expected_literals.items()):
+        raise ValueError("Invalid analysis context methodology boundary")
+
+    methods = value.get("retrieval_methods")
+    if methods != ["BM25", "MedCPT", "BMRetriever"]:
+        raise ValueError("Invalid analysis context retrieval methods")
+
+    for key in (
+        "source_depth",
+        "dense_nprobe",
+        "rerank_depth",
+        "article_top_k",
+        "max_evidence_sentences_per_article",
+    ):
+        raw = value.get(key)
+        if isinstance(raw, bool) or not isinstance(raw, int) or raw <= 0:
+            raise ValueError(f"Invalid analysis context value: {key}")
+    rrf_k = value.get("rrf_k")
+    if isinstance(rrf_k, bool) or not isinstance(rrf_k, int) or rrf_k < 0:
+        raise ValueError("Invalid analysis context value: rrf_k")
+    if int(value["article_top_k"]) > int(value["rerank_depth"]):
+        raise ValueError("analysis context article_top_k exceeds rerank_depth")
+    return dict(value)
 
 
 @dataclass(frozen=True)
@@ -111,6 +171,29 @@ class PipelineConfig:
                 "max_evidence_sentences": self.max_evidence_sentences,
             },
         }
+
+    def analysis_context(self) -> dict[str, Any]:
+        """Return the stable, user-facing methodology description for this run."""
+
+        context = {
+            "schema_version": ANALYSIS_CONTEXT_SCHEMA_VERSION,
+            "scope": "retrieved_top_articles",
+            "is_systematic_review": False,
+            "is_clinical_recommendation": False,
+            "is_final_medical_truth": False,
+            "aggregation_method": "deterministic_article_count",
+            "uses_confidence_weighting": False,
+            "retrieval_methods": ["BM25", "MedCPT", "BMRetriever"],
+            "fusion_method": "reciprocal_rank_fusion",
+            "reranker": "MedCPT Cross-Encoder",
+            "source_depth": self.source_depth,
+            "dense_nprobe": self.dense_nprobe,
+            "rrf_k": self.rrf_k,
+            "rerank_depth": self.rerank_depth,
+            "article_top_k": self.final_article_top_k,
+            "max_evidence_sentences_per_article": self.max_evidence_sentences,
+        }
+        return validate_analysis_context(context)
 
 
 def _resolve(root: Path, value: Path | None, default: Path) -> Path:

@@ -34,7 +34,7 @@ from evidencegap_backend.stance.llm_judge import (
     call_structured_llm,
 )
 
-STATEMENT_DECOMPOSITION_SCHEMA_VERSION = "1.1.0"
+STATEMENT_DECOMPOSITION_SCHEMA_VERSION = "1.2.0"
 STATEMENT_DECOMPOSITION_CONTRACT_ID = "phase075.statement-decomposition.v1"
 STATEMENT_DECOMPOSITION_PROMPT_VERSION = "phase075_statement_decomposition_v3"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/pipeline/statement_decomposition")
@@ -153,6 +153,27 @@ def _duplicate_key(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip().lower()).rstrip(".?!")
 
 
+def exact_source_spans(statement: str, source_text: str) -> list[dict[str, int]]:
+    """Return every exact occurrence of ``source_text`` in ``statement``."""
+
+    if not source_text:
+        return []
+    spans: list[dict[str, int]] = []
+    start = 0
+    while True:
+        index = statement.find(source_text, start)
+        if index < 0:
+            break
+        spans.append(
+            {
+                "character_start": index,
+                "character_end": index + len(source_text),
+            }
+        )
+        start = index + 1
+    return spans
+
+
 def validate_response_payload(
     payload: Mapping[str, Any], *, original_statement: str
 ) -> dict[str, Any]:
@@ -181,7 +202,8 @@ def validate_response_payload(
                 retryable=True,
             )
         source_text = str(raw_claim.get("source_text") or "").strip()
-        if not source_text or source_text not in original_statement:
+        source_spans = exact_source_spans(original_statement, source_text)
+        if not source_text or not source_spans:
             raise _ProviderError(
                 f"{claim_ref}.source_text must be an exact contiguous quote from the input",
                 retryable=True,
@@ -212,6 +234,7 @@ def validate_response_payload(
             {
                 "claim_id": claim_id,
                 "source_text": source_text,
+                "source_spans": source_spans,
                 "canonical_claim_en": canonical_claim_en,
             }
         )
@@ -308,10 +331,14 @@ def validate_decomposition_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(claim, Mapping):
             raise EvidenceGapError("Statement decomposition claim must be an object")
         source_text = str(claim.get("source_text") or "").strip()
+        source_spans = claim.get("source_spans")
         canonical = str(claim.get("canonical_claim_en") or "").strip()
         claim_id = str(claim.get("claim_id") or "").strip()
-        if not source_text or source_text not in original_statement:
+        expected_spans = exact_source_spans(original_statement, source_text)
+        if not source_text or not expected_spans:
             raise EvidenceGapError("Statement decomposition source_text is not grounded")
+        if source_spans != expected_spans:
+            raise EvidenceGapError("Statement decomposition source_spans mismatch")
         if not canonical or claim_id != runtime_claim_id(canonical):
             raise EvidenceGapError("Statement decomposition claim identity mismatch")
         duplicate_key = _duplicate_key(canonical)

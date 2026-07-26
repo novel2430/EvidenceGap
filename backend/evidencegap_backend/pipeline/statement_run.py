@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 from evidencegap_backend.common import (
     EvidenceGapError,
@@ -35,7 +36,7 @@ from evidencegap_backend.pipeline.statement_decomposition import (
     validate_statement_decomposition_artifact,
 )
 
-STATEMENT_RUN_SCHEMA_VERSION = "2.0.0"
+STATEMENT_RUN_SCHEMA_VERSION = "2.1.0"
 STATEMENT_RUN_CONTRACT_ID = "phase077.complete-run.v1"
 if TYPE_CHECKING:
     from evidencegap_backend.resources import RuntimeResources
@@ -49,6 +50,38 @@ _STAGE_NAMES = {
     "gaps": "gaps",
     "output": "output",
 }
+_EXECUTION_STAGE_NAMES = {
+    "decomposition": "statement_decomposition",
+    "analysis": "claim_analysis",
+    "bundle": "statement_bundle",
+    "gaps": "inference_gap_analysis",
+    "output": "output_generation",
+}
+
+ProgressCallback = Callable[[Mapping[str, Any]], None]
+
+
+def _emit_progress(
+    callback: ProgressCallback | None,
+    *,
+    stage: str,
+    stage_index: int,
+    message: str,
+    completed_units: int | None = None,
+    total_units: int | None = None,
+) -> None:
+    if callback is None:
+        return
+    callback(
+        {
+            "stage": stage,
+            "stage_index": stage_index,
+            "total_stages": 5,
+            "message": message,
+            "completed_units": completed_units,
+            "total_units": total_units,
+        }
+    )
 
 
 def _safe_name(value: str) -> str:
@@ -90,6 +123,58 @@ def _stage_meta(root: Path, artifact_dir: Path) -> dict[str, Any]:
             "sha256": sha256_file(manifest_path),
         },
     }
+
+
+def _read_stage_seconds(artifact_dir: Path) -> float:
+    manifest = _read_json_object(artifact_dir / "run_manifest.json")
+    raw_seconds = manifest.get("seconds")
+    if isinstance(raw_seconds, bool):
+        raise EvidenceGapError(
+            f"Nested stage manifest has invalid seconds: {artifact_dir}"
+        )
+    try:
+        seconds = float(raw_seconds)
+    except (TypeError, ValueError) as exc:
+        raise EvidenceGapError(
+            f"Nested stage manifest has invalid seconds: {artifact_dir}"
+        ) from exc
+    if not math.isfinite(seconds) or seconds < 0:
+        raise EvidenceGapError(
+            f"Nested stage manifest has negative seconds: {artifact_dir}"
+        )
+    return seconds
+
+
+def build_execution_summary(
+    stage_dirs: Mapping[str, Path], *, total_seconds: float
+) -> dict[str, Any]:
+    if set(stage_dirs) != set(_STAGE_NAMES):
+        raise EvidenceGapError("Execution summary stage set is incomplete")
+    if isinstance(total_seconds, bool) or not math.isfinite(
+        float(total_seconds)
+    ) or total_seconds < 0:
+        raise EvidenceGapError("Execution summary total_seconds cannot be negative")
+    return {
+        "total_seconds": float(total_seconds),
+        "stages": {
+            _EXECUTION_STAGE_NAMES[key]: {
+                "seconds": _read_stage_seconds(stage_dirs[key])
+            }
+            for key in _STAGE_NAMES
+        },
+    }
+
+
+def validate_execution_summary(
+    value: Mapping[str, Any],
+    *,
+    stage_dirs: Mapping[str, Path],
+    total_seconds: float,
+) -> dict[str, Any]:
+    expected = build_execution_summary(stage_dirs, total_seconds=total_seconds)
+    if dict(value) != expected:
+        raise EvidenceGapError("Statement run execution summary mismatch")
+    return expected
 
 
 def _resolve_deepseek_thinking(
@@ -155,6 +240,7 @@ def run_statement_pipeline(
     stage_configs: Mapping[str, LLMStageConfig] | None = None,
     pipeline_config: PipelineConfig | None = None,
     resolved_config_snapshot: Mapping[str, Any] | None = None,
+    progress_callback: ProgressCallback | None = None,
     force: bool = False,
 ) -> dict[str, Any]:
     root = root.resolve()
@@ -277,6 +363,12 @@ def run_statement_pipeline(
         resolved_config_path = target / "resolved_config.json"
         atomic_write_json(resolved_config_path, dict(resolved_config_snapshot))
 
+    _emit_progress(
+        progress_callback,
+        stage="statement_decomposition",
+        stage_index=1,
+        message="Decomposing statement into verifiable biomedical claims",
+    )
     decomposition_result = run_statement_decomposition(
         root,
         statement=statement,
@@ -296,6 +388,30 @@ def run_statement_pipeline(
     decomposition_dir = target / _STAGE_NAMES["decomposition"]
 
     decomposition_value = decomposition_result.get("decomposition")
+    total_claims = (
+        len(decomposition_value.get("claims", []))
+        if isinstance(decomposition_value, Mapping)
+        else None
+    )
+    _emit_progress(
+        progress_callback,
+        stage="claim_analysis",
+        stage_index=2,
+        message="Retrieving and evaluating evidence for extracted claims",
+        completed_units=0 if total_claims is not None else None,
+        total_units=total_claims,
+    )
+
+    def claim_progress(completed: int, total: int) -> None:
+        _emit_progress(
+            progress_callback,
+            stage="claim_analysis",
+            stage_index=2,
+            message=f"Analyzed {completed} of {total} claims",
+            completed_units=completed,
+            total_units=total,
+        )
+
     analysis_result = run_statement_analysis(
         root,
         decomposition_artifact_dir=decomposition_dir,
@@ -333,10 +449,17 @@ def run_statement_pipeline(
             if isinstance(decomposition_value, Mapping)
             else None
         ),
+        progress_callback=claim_progress,
         force=False,
     )
     analysis_dir = target / _STAGE_NAMES["analysis"]
 
+    _emit_progress(
+        progress_callback,
+        stage="statement_bundle",
+        stage_index=3,
+        message="Building the statement evidence bundle",
+    )
     bundle_kwargs: dict[str, Any] = {}
     if (
         isinstance(analysis_result.get("decomposition"), Mapping)
@@ -360,6 +483,12 @@ def run_statement_pipeline(
     bundle_path = bundle_dir / "statement_bundle.json"
 
     statement_bundle_value = bundle_result.get("statement_bundle")
+    _emit_progress(
+        progress_callback,
+        stage="inference_gap_analysis",
+        stage_index=4,
+        message="Checking scope and causal inference gaps",
+    )
     gap_kwargs = (
         {"statement_bundle": statement_bundle_value}
         if isinstance(statement_bundle_value, Mapping)
@@ -386,6 +515,12 @@ def run_statement_pipeline(
     gap_path = gap_dir / "inference_gap_analysis.json"
 
     gap_bundle_value = gap_result.get("inference_gap_bundle")
+    _emit_progress(
+        progress_callback,
+        stage="output_generation",
+        stage_index=5,
+        message="Preparing the presentation bundle",
+    )
     output_kwargs: dict[str, Any] = {}
     if isinstance(statement_bundle_value, Mapping) and isinstance(
         gap_bundle_value, Mapping
@@ -416,6 +551,9 @@ def run_statement_pipeline(
     output_dir = target / _STAGE_NAMES["output"]
     presentation_path = output_dir / "presentation_bundle.json"
 
+    stage_dirs = {
+        key: target / directory for key, directory in _STAGE_NAMES.items()
+    }
     stage_artifacts = {
         key: _stage_meta(root, target / directory)
         for key, directory in _STAGE_NAMES.items()
@@ -438,6 +576,10 @@ def run_statement_pipeline(
             "gap_api_requests": int(gap_result["api_requests"]),
             "translation_api_requests": int(output_result["api_requests"]),
         }
+    )
+    total_seconds = round(time.perf_counter() - started, 6)
+    execution_summary = build_execution_summary(
+        stage_dirs, total_seconds=total_seconds
     )
     manifest = {
         "schema_version": STATEMENT_RUN_SCHEMA_VERSION,
@@ -486,6 +628,7 @@ def run_statement_pipeline(
             "stage_handoff": "in_memory_with_artifact_persistence",
         },
         "stages": stage_artifacts,
+        "execution_summary": execution_summary,
         "counts": counts,
         "outputs": {
             **(
@@ -511,7 +654,7 @@ def run_statement_pipeline(
                 "sha256": sha256_file(presentation_path),
             },
         },
-        "seconds": round(time.perf_counter() - started, 6),
+        "seconds": total_seconds,
     }
     atomic_write_json(target / "run_manifest.json", manifest)
 
@@ -524,6 +667,7 @@ def run_statement_pipeline(
         "analysis_status": analysis_result["analysis_status"],
         "output_language": output_result["output_language"],
         "localized": output_result["localized"],
+        "execution_summary": execution_summary,
         **counts,
         "empty_claims": counts["total_claims"] == 0,
         "statement_bundle_path": relative_path(root, bundle_path),
@@ -580,6 +724,24 @@ def validate_statement_pipeline_artifact(artifact_dir: Path) -> dict[str, Any]:
         ):
             raise EvidenceGapError(f"Statement run stage checksum mismatch: {key}")
         stage_dirs[key] = stage_dir
+
+    raw_total_seconds = manifest.get("seconds")
+    if isinstance(raw_total_seconds, bool):
+        raise EvidenceGapError("Statement run total seconds is invalid")
+    try:
+        total_seconds = float(raw_total_seconds)
+    except (TypeError, ValueError) as exc:
+        raise EvidenceGapError("Statement run total seconds is invalid") from exc
+    if not math.isfinite(total_seconds) or total_seconds < 0:
+        raise EvidenceGapError("Statement run total seconds is invalid")
+    execution_summary = manifest.get("execution_summary")
+    if not isinstance(execution_summary, Mapping):
+        raise EvidenceGapError("Statement run execution summary is missing")
+    validate_execution_summary(
+        execution_summary,
+        stage_dirs=stage_dirs,
+        total_seconds=total_seconds,
+    )
 
     decomposition_validation = validate_statement_decomposition_artifact(
         stage_dirs["decomposition"]
@@ -697,6 +859,7 @@ def validate_statement_pipeline_artifact(artifact_dir: Path) -> dict[str, Any]:
         "analysis_status": manifest.get("analysis_status"),
         "output_language": manifest.get("output_language"),
         "localized": bool(manifest.get("localized")),
+        "execution_summary": dict(execution_summary),
         **expected_counts,
         "empty_claims": expected_counts["total_claims"] == 0,
         "statement_bundle_path": relative_path(

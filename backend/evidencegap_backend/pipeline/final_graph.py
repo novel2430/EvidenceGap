@@ -15,13 +15,16 @@ from evidencegap_backend.common import (
     sha256_text,
     find_workspace_root,
 )
-from evidencegap_backend.pipeline.article_evidence import validate_article_evidence_artifact
+from evidencegap_backend.pipeline.article_evidence import (
+    validate_article_evidence_artifact,
+    validate_retrieval_trace,
+)
 from evidencegap_backend.pipeline.claim_aggregation import (
     aggregate_article_evidence_rows,
     validate_claim_aggregation_artifact,
 )
 
-FINAL_GRAPH_SCHEMA_VERSION = "2.0.0"
+FINAL_GRAPH_SCHEMA_VERSION = "2.1.0"
 FINAL_GRAPH_CONTRACT_ID = "phase07.final-graph.v2"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/pipeline/final_graph")
 
@@ -145,6 +148,10 @@ def build_final_graph_bundle(
         stance = str(row["predicted_label"])
         article_node_id = _node_id("article", claim_id + chr(0) + article_id)
         selected_evidence = [dict(value) for value in row.get("selected_evidence") or []]
+        retrieval_trace = row.get("retrieval_trace")
+        if not isinstance(retrieval_trace, Mapping):
+            raise EvidenceGapError(f"Missing retrieval trace for {article_id}")
+        validate_retrieval_trace(retrieval_trace)
         nodes.append(
             {
                 "node_id": article_node_id,
@@ -155,6 +162,7 @@ def build_final_graph_bundle(
                 "article_id": article_id,
                 "pmid": None if row.get("pmid") is None else str(row["pmid"]),
                 "final_article_rank": int(row["final_article_rank"]),
+                "retrieval_trace": dict(retrieval_trace),
                 "stance": stance,
                 "confidence": float(row.get("confidence") or 0.0),
                 "probabilities": dict(row.get("probabilities") or {}),

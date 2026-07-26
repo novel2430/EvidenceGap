@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -14,6 +15,8 @@ from evidencegap_backend.common import (
     sha256_file,
     find_workspace_root,
 )
+from evidencegap_backend.config import validate_analysis_context
+from evidencegap_backend.pipeline.article_evidence import validate_retrieval_trace
 from evidencegap_backend.pipeline.final_graph import (
     FINAL_GRAPH_CONTRACT_ID,
     FINAL_GRAPH_SCHEMA_VERSION,
@@ -23,11 +26,12 @@ from evidencegap_backend.pipeline.statement_analysis import (
     validate_statement_analysis_bundle,
 )
 from evidencegap_backend.pipeline.statement_decomposition import (
+    exact_source_spans,
     runtime_inference_step_id,
     validate_decomposition_bundle,
 )
 
-STATEMENT_BUNDLE_SCHEMA_VERSION = "1.1.0"
+STATEMENT_BUNDLE_SCHEMA_VERSION = "1.2.0"
 STATEMENT_BUNDLE_CONTRACT_ID = "phase075.statement-bundle.v1"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/pipeline/statement_bundle")
 _VALID_VERDICTS = {"supported", "refuted", "mixed", "insufficient"}
@@ -64,6 +68,65 @@ def _find_repo_root(start: Path) -> Path:
 
 def _merged_evidence_id(claim_id: str, source_node_id: str) -> str:
     return f"{claim_id}:{source_node_id}"
+
+
+def inference_impacts(
+    claims: list[Mapping[str, Any]], steps: list[Mapping[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    """Compute deterministic downstream impact for every inference step."""
+
+    claim_order = {str(claim["claim_id"]): index for index, claim in enumerate(claims)}
+    step_order = {
+        str(step["inference_step_id"]): index for index, step in enumerate(steps)
+    }
+    outgoing: dict[str, list[Mapping[str, Any]]] = {
+        claim_id: [] for claim_id in claim_order
+    }
+    for step in steps:
+        for premise_id in step["premise_claim_ids"]:
+            outgoing[str(premise_id)].append(step)
+
+    impacts: dict[str, dict[str, Any]] = {}
+    for source_step in steps:
+        direct_claim_id = str(source_step["conclusion_claim_id"])
+        reachable_claims: set[str] = set()
+        reachable_steps: set[str] = set()
+        state: dict[str, int] = {}
+        cycle_detected = False
+
+        def visit(claim_id: str) -> None:
+            nonlocal cycle_detected
+            marker = state.get(claim_id, 0)
+            if marker == 1:
+                cycle_detected = True
+                return
+            if marker == 2:
+                return
+            state[claim_id] = 1
+            reachable_claims.add(claim_id)
+            for step in outgoing.get(claim_id, []):
+                reachable_steps.add(str(step["inference_step_id"]))
+                visit(str(step["conclusion_claim_id"]))
+            state[claim_id] = 2
+
+        visit(direct_claim_id)
+        terminal_claim_ids = [
+            claim_id
+            for claim_id in reachable_claims
+            if not outgoing.get(claim_id)
+        ]
+        ordered_claims = sorted(reachable_claims, key=claim_order.__getitem__)
+        ordered_steps = sorted(reachable_steps, key=step_order.__getitem__)
+        ordered_terminals = sorted(terminal_claim_ids, key=claim_order.__getitem__)
+        impacts[str(source_step["inference_step_id"])] = {
+            "direct_conclusion_claim_id": direct_claim_id,
+            "downstream_claim_ids": ordered_claims,
+            "downstream_inference_step_ids": ordered_steps,
+            "terminal_claim_ids": ordered_terminals,
+            "affects_terminal_conclusion": bool(ordered_terminals),
+            "cycle_detected": cycle_detected,
+        }
+    return impacts
 
 
 def _flatten_graph(
@@ -143,6 +206,7 @@ def _flatten_graph(
             "article_id": str(node.get("article_id") or ""),
             "pmid": node.get("pmid"),
             "rank": int(node.get("final_article_rank", -1)),
+            "retrieval_trace": dict(node.get("retrieval_trace") or {}),
             "title": str(node.get("label") or ""),
             "rationale": str(node.get("text") or ""),
             "stance": str(node.get("stance") or ""),
@@ -188,7 +252,7 @@ def build_statement_bundle(
     articles: list[dict[str, Any]] = []
     evidence: list[dict[str, Any]] = []
     for source_claim, result in zip(source_claims, analysis_claims, strict=True):
-        for key in ("claim_id", "source_text", "canonical_claim_en"):
+        for key in ("claim_id", "source_text", "source_spans", "canonical_claim_en"):
             if source_claim.get(key) != result.get(key):
                 raise EvidenceGapError(f"Statement bundle claim mismatch: {key}")
 
@@ -197,6 +261,7 @@ def build_statement_bundle(
         record: dict[str, Any] = {
             "claim_id": claim_id,
             "source_text": str(result["source_text"]),
+            "source_spans": [dict(span) for span in result["source_spans"]],
             "canonical_claim_en": str(result["canonical_claim_en"]),
             "analysis_status": status,
             "verdict": result.get("verdict"),
@@ -236,6 +301,23 @@ def build_statement_bundle(
             evidence.extend(claim_evidence)
         claims.append(record)
 
+    source_steps = [
+        {
+            "inference_step_id": str(step["inference_step_id"]),
+            "premise_claim_ids": list(step["premise_claim_ids"]),
+            "conclusion_claim_id": str(step["conclusion_claim_id"]),
+        }
+        for step in decomposition.get("inference_steps", [])
+    ]
+    impacts = inference_impacts(claims, source_steps)
+    analysis_context = statement_result.get("analysis_context")
+    if not isinstance(analysis_context, Mapping):
+        raise EvidenceGapError("Statement analysis context is missing")
+    try:
+        validated_context = validate_analysis_context(analysis_context)
+    except ValueError as exc:
+        raise EvidenceGapError("Statement analysis context is invalid") from exc
+
     bundle = {
         "schema_version": STATEMENT_BUNDLE_SCHEMA_VERSION,
         "contract_id": STATEMENT_BUNDLE_CONTRACT_ID,
@@ -245,14 +327,14 @@ def build_statement_bundle(
             "source_language": str(decomposition["source_language"]),
             "analysis_status": str(statement_result["analysis_status"]),
         },
+        "analysis_context": validated_context,
         "claims": claims,
         "inference_steps": [
             {
-                "inference_step_id": str(step["inference_step_id"]),
-                "premise_claim_ids": list(step["premise_claim_ids"]),
-                "conclusion_claim_id": str(step["conclusion_claim_id"]),
+                **step,
+                "impact": impacts[step["inference_step_id"]],
             }
-            for step in decomposition.get("inference_steps", [])
+            for step in source_steps
         ],
         "articles": articles,
         "evidence": evidence,
@@ -279,6 +361,7 @@ def validate_statement_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
     ):
         raise EvidenceGapError("Unexpected statement bundle contract")
     statement = bundle.get("statement")
+    analysis_context = bundle.get("analysis_context")
     collections = [
         bundle.get("claims"),
         bundle.get("inference_steps"),
@@ -299,6 +382,12 @@ def validate_statement_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         )
     ):
         raise EvidenceGapError("Statement bundle source fields cannot be blank")
+    if not isinstance(analysis_context, Mapping):
+        raise EvidenceGapError("Statement bundle analysis context is missing")
+    try:
+        validate_analysis_context(analysis_context)
+    except ValueError as exc:
+        raise EvidenceGapError("Statement bundle analysis context is invalid") from exc
 
     claims, steps, articles, evidence = collections
     claim_by_id: dict[str, Mapping[str, Any]] = {}
@@ -306,11 +395,15 @@ def validate_statement_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(claim, Mapping):
             raise EvidenceGapError("Statement bundle claim must be an object")
         claim_id = str(claim.get("claim_id") or "")
+        source_text = str(claim.get("source_text") or "")
         status = str(claim.get("analysis_status") or "")
         if (
             not claim_id
             or claim_id in claim_by_id
             or status not in {"completed", "failed"}
+            or not source_text
+            or claim.get("source_spans")
+            != exact_source_spans(str(statement["original_text"]), source_text)
         ):
             raise EvidenceGapError("Invalid statement bundle claim")
         if status == "completed":
@@ -330,6 +423,7 @@ def validate_statement_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
 
     inference_step_ids: set[str] = set()
     inference_step_keys: set[tuple[tuple[str, ...], str]] = set()
+    bare_steps: list[dict[str, Any]] = []
     for step in steps:
         if not isinstance(step, Mapping):
             raise EvidenceGapError("Invalid inference step")
@@ -364,6 +458,19 @@ def validate_statement_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
             raise EvidenceGapError("Duplicate inference step")
         inference_step_ids.add(inference_step_id)
         inference_step_keys.add(step_key)
+        bare_steps.append(
+            {
+                "inference_step_id": inference_step_id,
+                "premise_claim_ids": premise_ids,
+                "conclusion_claim_id": conclusion,
+            }
+        )
+
+    expected_impacts = inference_impacts(claims, bare_steps)
+    for step in steps:
+        step_id = str(step["inference_step_id"])
+        if step.get("impact") != expected_impacts[step_id]:
+            raise EvidenceGapError("Inference step impact mismatch")
 
     article_by_id: dict[str, Mapping[str, Any]] = {}
     for article in articles:
@@ -380,6 +487,12 @@ def validate_statement_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
             or not isinstance(article.get("evidence_ids"), list)
         ):
             raise EvidenceGapError("Invalid Article identity")
+        trace = article.get("retrieval_trace")
+        if not isinstance(trace, Mapping):
+            raise EvidenceGapError("Article retrieval trace is missing")
+        validate_retrieval_trace(trace)
+        if int(trace["final_article_rank"]) != int(article.get("rank", -1)):
+            raise EvidenceGapError("Article retrieval trace rank mismatch")
         article_by_id[node_id] = article
 
     evidence_by_id: dict[str, Mapping[str, Any]] = {}
@@ -452,6 +565,7 @@ def run_statement_bundle(
     force: bool = False,
 ) -> dict[str, Any]:
     root = root.resolve()
+    started = time.perf_counter()
     analysis_dir = _resolve(root, statement_analysis_artifact_dir)
     request = _read_json_object(analysis_dir / "request.json")
     statement_result_path = analysis_dir / "statement_result.json"
@@ -543,6 +657,7 @@ def run_statement_bundle(
                 },
                 "counts": dict(bundle["summary"]),
                 "analysis_status": bundle["statement"]["analysis_status"],
+                "seconds": round(time.perf_counter() - started, 6),
             },
         )
     return {

@@ -5,7 +5,7 @@ import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 from evidencegap_backend.common import (
     EvidenceGapError,
@@ -15,16 +15,17 @@ from evidencegap_backend.common import (
     sha256_file,
     find_workspace_root,
 )
-from evidencegap_backend.config import PipelineConfig
+from evidencegap_backend.config import PipelineConfig, validate_analysis_context
 from evidencegap_backend.prompting import PromptOverride
 from evidencegap_backend.pipeline.analysis import run_analysis, validate_analysis_artifact
 from evidencegap_backend.pipeline.retrieval_adapters import runtime_claim_id
 from evidencegap_backend.pipeline.statement_decomposition import (
+    exact_source_spans,
     validate_decomposition_bundle,
     validate_statement_decomposition_artifact,
 )
 
-STATEMENT_ANALYSIS_SCHEMA_VERSION = "1.0.0"
+STATEMENT_ANALYSIS_SCHEMA_VERSION = "1.1.0"
 STATEMENT_ANALYSIS_CONTRACT_ID = "phase075.statement-analysis.v1"
 if TYPE_CHECKING:
     from evidencegap_backend.resources import RuntimeResources
@@ -79,6 +80,10 @@ def validate_statement_analysis_bundle(bundle: Mapping[str, Any]) -> dict[str, A
     source_language = str(bundle.get("source_language") or "").strip()
     if not statement_id or not original_statement or not source_language:
         raise EvidenceGapError("Statement analysis source fields cannot be blank")
+    try:
+        validate_analysis_context(bundle.get("analysis_context") or {})
+    except ValueError as exc:
+        raise EvidenceGapError("Invalid statement analysis context") from exc
 
     claims = bundle.get("claim_results")
     if not isinstance(claims, list):
@@ -92,6 +97,7 @@ def validate_statement_analysis_bundle(bundle: Mapping[str, Any]) -> dict[str, A
             raise EvidenceGapError("Statement analysis claim result must be an object")
         claim_id = str(row.get("claim_id") or "").strip()
         source_text = str(row.get("source_text") or "").strip()
+        source_spans = row.get("source_spans")
         canonical = str(row.get("canonical_claim_en") or "").strip()
         status = str(row.get("status") or "").strip()
         if (
@@ -101,6 +107,8 @@ def validate_statement_analysis_bundle(bundle: Mapping[str, Any]) -> dict[str, A
             or not source_text
             or not canonical
             or source_text not in original_statement
+            or not isinstance(source_spans, list)
+            or source_spans != exact_source_spans(original_statement, source_text)
         ):
             raise EvidenceGapError("Invalid statement analysis claim identity")
         claim_ids.add(claim_id)
@@ -189,6 +197,7 @@ def run_statement_analysis(
     prompt_override: PromptOverride | None = None,
     pipeline_config: PipelineConfig | None = None,
     decomposition_bundle: Mapping[str, Any] | None = None,
+    progress_callback: Callable[[int, int], None] | None = None,
     force: bool = False,
 ) -> dict[str, Any]:
     root = root.resolve()
@@ -202,6 +211,7 @@ def run_statement_analysis(
         decomposition = dict(decomposition_bundle)
         source_handoff = "in_memory_handoff"
     decomposition_validation = validate_decomposition_bundle(decomposition)
+    pipeline_settings = pipeline_config or PipelineConfig()
 
     name = _safe_name(run_name)
     base = artifact_root.resolve() if artifact_root else root / DEFAULT_ARTIFACT_ROOT
@@ -226,9 +236,13 @@ def run_statement_analysis(
 
     claim_results: list[dict[str, Any]] = []
     claim_graph_bundles: dict[str, dict[str, Any]] = {}
+    total_claims = len(decomposition["claims"])
+    if progress_callback is not None:
+        progress_callback(0, total_claims)
     for claim in decomposition["claims"]:
         claim_id = str(claim["claim_id"])
         source_text = str(claim["source_text"])
+        source_spans = [dict(span) for span in claim["source_spans"]]
         canonical_claim_en = str(claim["canonical_claim_en"])
         claim_artifact_dir = claims_root / claim_id
         try:
@@ -263,7 +277,7 @@ def run_statement_analysis(
                 cache_dir=cache_dir,
                 runtime_resources=runtime_resources,
                 prompt_override=prompt_override,
-                pipeline_config=pipeline_config,
+                pipeline_config=pipeline_settings,
                 force=False,
             )
             if result.get("claim_id") != claim_id:
@@ -281,6 +295,7 @@ def run_statement_analysis(
                 {
                     "claim_id": claim_id,
                     "source_text": source_text,
+                    "source_spans": source_spans,
                     "canonical_claim_en": canonical_claim_en,
                     "status": "completed",
                     "phase07_artifact_dir": relative_path(root, claim_artifact_dir),
@@ -294,6 +309,7 @@ def run_statement_analysis(
                 {
                     "claim_id": claim_id,
                     "source_text": source_text,
+                    "source_spans": source_spans,
                     "canonical_claim_en": canonical_claim_en,
                     "status": "failed",
                     "phase07_artifact_dir": (
@@ -306,6 +322,9 @@ def run_statement_analysis(
                     "error": str(exc),
                 }
             )
+        finally:
+            if progress_callback is not None:
+                progress_callback(len(claim_results), total_claims)
 
     completed = sum(row["status"] == "completed" for row in claim_results)
     failed = sum(row["status"] == "failed" for row in claim_results)
@@ -321,6 +340,7 @@ def run_statement_analysis(
         "original_statement": decomposition["original_statement"],
         "source_language": decomposition["source_language"],
         "analysis_status": analysis_status,
+        "analysis_context": pipeline_settings.analysis_context(),
         "claim_results": claim_results,
         "summary": {
             "total_claims": len(claim_results),
@@ -433,7 +453,7 @@ def validate_statement_analysis_artifact(artifact_dir: Path) -> dict[str, Any]:
     if len(expected_claims) != len(actual_claims):
         raise EvidenceGapError("Statement analysis claim count differs from decomposition")
     for expected, actual in zip(expected_claims, actual_claims, strict=True):
-        for key in ("claim_id", "source_text", "canonical_claim_en"):
+        for key in ("claim_id", "source_text", "source_spans", "canonical_claim_en"):
             if actual.get(key) != expected.get(key):
                 raise EvidenceGapError(
                     f"Statement analysis claim does not match decomposition: {key}"
