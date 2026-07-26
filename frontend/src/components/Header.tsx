@@ -1,53 +1,39 @@
-import { GitBranch, Sparkles } from 'lucide-react'
-import type { DemoCase, ViewMode } from '../types'
+import { GitBranch, History, Server } from 'lucide-react'
+import type { RunStatusResponse } from '../contracts'
 
-export function Header({
-  currentCase,
-  viewMode,
-  targetActive,
-  onViewModeChange,
-  onToggleTarget,
-}: {
-  currentCase: DemoCase
-  viewMode: ViewMode
-  targetActive: boolean
-  onViewModeChange: (mode: ViewMode) => void
-  onToggleTarget: () => void
-}) {
+interface HeaderProps {
+  run: RunStatusResponse | null
+  onOpenHistory: () => void
+}
+
+export function Header({ run, onOpenHistory }: HeaderProps) {
+  const integrationLabel = run ? `Run ${run.status}` : 'Ready for analysis'
+
   return (
     <header className="app-header">
       <div className="brand-block">
         <div className="brand-mark">
           <GitBranch size={20} />
         </div>
-        <div className="brand-title">EvidenceGap</div>
-      </div>
-
-      <div className="case-headline">
-        <strong>{currentCase.title}</strong>
-        <em className={`status-pill status-${currentCase.status.toLowerCase()}`}>{currentCase.status}</em>
+        <div>
+          <div className="brand-title">EvidenceGap</div>
+          <div className="brand-subtitle">Statement evidence analysis</div>
+        </div>
       </div>
 
       <div className="header-actions">
-        <div className="mode-switch">
-          {(['all', 'gaps', 'conflicts'] as ViewMode[]).map((mode) => (
-            <button
-              type="button"
-              className={viewMode === mode ? 'active' : ''}
-              onClick={() => onViewModeChange(mode)}
-              key={mode}
-            >
-              {mode}
-            </button>
-          ))}
+        <div className="integration-state" role="status">
+          <Server size={15} />
+          {integrationLabel}
         </div>
         <button
+          className="history-button"
           type="button"
-          className={targetActive ? 'target-toggle active' : 'target-toggle'}
-          onClick={onToggleTarget}
+          onClick={onOpenHistory}
+          aria-label="Open Recent Runs"
+          title="Recent Runs"
         >
-          <Sparkles size={15} />
-          Target Path
+          <History size={17} />
         </button>
       </div>
     </header>

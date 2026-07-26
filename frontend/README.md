@@ -1,23 +1,48 @@
 # EvidenceGap Frontend
 
-V0 的 React + TypeScript + Vite 前端，用於展示醫療結論的證據鏈、證據缺口與安全結論比較。
+React + TypeScript + Vite frontend for the EvidenceGap backend.
 
-## 開發
+The previous synthetic V0 case model and its unsupported presentation logic have been removed. The current frontend intentionally contains only the reusable workspace shell while the real backend contracts and API integration are introduced.
+
+## Retained foundation
+
+- `react-resizable-panels` for the adjustable workspace layout.
+- `@xyflow/react` for the claim and inference graph surface.
+- `elkjs` remains available for graph layout once backend presentation data is connected.
+- Separate regions for run history, graph navigation, evidence inspection, and run summaries.
+
+The frontend must render backend-provided analysis results and must not independently invent claim states, gap categories, conclusions, or evidence metadata.
+
+## Development
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-專案要求 Node.js 24，套件管理器為 pnpm 11。
+The project requires Node.js 24 and pnpm 11.
 
-## 可調整工作區
 
-工作台使用 `react-resizable-panels` 建立巢狀可調整版面：
+## Backend API
 
-- 拖曳左側案例列表、中央 Claim Graph、右側 Evidence Inspector 之間的直向分隔線，可調整各欄寬度。
-- 拖曳主工作區與底部報告之間的橫向分隔線，可調整上下高度。
-- 拖曳 Gap Report 與 Conclusion Compare 之間的分隔線，可調整底部兩區寬度。
-- 分隔線取得焦點後，可用方向鍵微調尺寸。
+The API client lives in `src/api.ts`. Its default base URL is:
 
-各面板都設定了最低尺寸，避免把內容壓縮到不可讀。
+```text
+https://www.next.zju.edu.cn/novel-evidencegap/back/
+```
+
+Override it for a deployment or local development by creating `.env.local`:
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:8030/
+```
+
+A caller may also create an isolated client with a runtime URL:
+
+```ts
+import { createEvidenceGapApi } from './api'
+
+const api = createEvidenceGapApi({ baseUrl: 'http://127.0.0.1:8030/' })
+```
+
+The client is not connected to the React workspace yet. This module only defines typed access to the current backend endpoints.

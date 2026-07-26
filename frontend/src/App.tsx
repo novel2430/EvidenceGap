@@ -1,114 +1,128 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertCircle, LoaderCircle, RefreshCw } from 'lucide-react'
+import { Navigate, Route, Routes, useParams } from 'react-router'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import './App.css'
-import { CaseSidebar } from './components/CaseSidebar'
+import { evidenceGapApi, EvidenceGapApiError } from './api'
+import { AnalysisForm } from './components/AnalysisForm'
+import { AnalysisSummary } from './components/AnalysisSummary'
 import { ClaimGraph } from './components/ClaimGraph'
-import { ConclusionCompare } from './components/ConclusionCompare'
-import { EvidenceInspector } from './components/EvidenceInspector'
-import { GapReport } from './components/GapReport'
 import { Header } from './components/Header'
-import { cases } from './data/cases'
-import type { InspectorSelection, ViewMode } from './types'
+import { RunDetails } from './components/RunDetails'
+import { RunHistoryDrawer } from './components/RunHistoryDrawer'
+import { useRunQuery } from './hooks/useRunQuery'
+import { getApiErrorMessage } from './utils/format'
 
-function App() {
-  const [caseId, setCaseId] = useState('V0-B-GAP-001')
-  const [selection, setSelection] = useState<InspectorSelection | null>({ kind: 'claim', id: 'B-C5' })
-  const [viewMode, setViewMode] = useState<ViewMode>('all')
-  const [targetActive, setTargetActive] = useState(true)
+function Workspace() {
+  const { runId } = useParams<{ runId: string }>()
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const closeHistory = useCallback(() => setIsHistoryOpen(false), [])
+  const queryClient = useQueryClient()
+  const runsQuery = useQuery({
+    queryKey: ['runs'],
+    queryFn: ({ signal }) => evidenceGapApi.listRuns({ limit: 20, signal }),
+  })
+  const runQuery = useRunQuery(runId)
+  const run = runQuery.data ?? null
+  const runStatus = run?.status
 
-  const currentCase = useMemo(() => cases.find((item) => item.id === caseId) ?? cases[0], [caseId])
+  useEffect(() => {
+    if (!runId || !runStatus) return
+    void queryClient.invalidateQueries({ queryKey: ['runs'] })
+  }, [queryClient, runId, runStatus])
 
-  function handleSelectCase(id: string) {
-    const nextCase = cases.find((item) => item.id === id)
-    if (!nextCase) return
-    setCaseId(id)
-    setSelection({ kind: 'claim', id: nextCase.claims.find((claim) => claim.isTarget)?.id ?? nextCase.claims[0].id })
-    setViewMode(id === 'V0-C-OVERREACH-001' ? 'conflicts' : 'all')
-    setTargetActive(true)
-  }
+  const runLoadError = runQuery.isError ? getApiErrorMessage(runQuery.error) : null
+  const isNotFound = runQuery.error instanceof EvidenceGapApiError && runQuery.error.status === 404
 
   return (
     <main className="workbench-shell">
-      <Header
-        currentCase={currentCase}
-        viewMode={viewMode}
-        targetActive={targetActive}
-        onViewModeChange={setViewMode}
-        onToggleTarget={() => setTargetActive((value) => !value)}
-      />
+      <Header run={run} onOpenHistory={() => setIsHistoryOpen(true)} />
 
       <div className="workbench-body">
         <Group className="workbench-split-group" orientation="vertical">
-          <Panel id="workspace" defaultSize="72%" minSize="360px">
+          <Panel id="workspace" defaultSize="74%" minSize="410px">
             <div className="split-panel-content">
               <Group className="workbench-split-group" orientation="horizontal">
-                <Panel id="case-sidebar" defaultSize="18%" minSize="220px" maxSize="34%">
+                <Panel id="new-analysis" defaultSize="25%" minSize="280px" maxSize="36%">
                   <div className="split-panel-content">
-                    <CaseSidebar cases={cases} currentId={currentCase.id} onSelect={handleSelectCase} />
+                    <AnalysisForm />
                   </div>
                 </Panel>
 
-                <Separator
-                  className="resize-handle resize-handle--vertical"
-                  aria-label="調整案例列表與圖表寬度"
-                />
+                <Separator className="resize-handle resize-handle--vertical" aria-label="Resize new analysis and graph workspace" />
 
-                <Panel id="claim-graph" defaultSize="57%" minSize="480px">
-                  <div className="split-panel-content">
-                    <ClaimGraph
-                      currentCase={currentCase}
-                      selection={selection}
-                      viewMode={viewMode}
-                      targetActive={targetActive}
-                      onSelect={setSelection}
-                    />
+                <Panel id="graph-workspace" defaultSize="48%" minSize="500px">
+                  <div className="center-result">
+                    {runQuery.isLoading && (
+                      <section className="load-state panel" role="status">
+                        <LoaderCircle className="spin" size={24} />
+                        <h2>Loading analysis run</h2>
+                        <p>Retrieving the current backend state…</p>
+                      </section>
+                    )}
+
+                    {runLoadError && (
+                      <section className="load-state load-state--error panel" role="alert">
+                        <AlertCircle size={24} />
+                        <h2>{isNotFound ? 'Run not found' : 'Run could not be loaded'}</h2>
+                        <p>{runLoadError}</p>
+                        <button className="secondary-button" type="button" onClick={() => void runQuery.refetch()}>
+                          <RefreshCw size={15} /> Retry
+                        </button>
+                      </section>
+                    )}
+
+                    {!runQuery.isLoading && !runLoadError && (
+                      <ClaimGraph presentation={run?.status === 'succeeded' ? run.result : null} />
+                    )}
                   </div>
                 </Panel>
 
-                <Separator
-                  className="resize-handle resize-handle--vertical"
-                  aria-label="調整圖表與證據檢視器寬度"
-                />
+                <Separator className="resize-handle resize-handle--vertical" aria-label="Resize analysis workspace and run details" />
 
-                <Panel id="evidence-inspector" defaultSize="25%" minSize="280px" maxSize="42%">
+                <Panel id="run-details" defaultSize="27%" minSize="300px" maxSize="42%">
                   <div className="split-panel-content">
-                    <EvidenceInspector currentCase={currentCase} selection={selection} />
+                    <RunDetails run={run} />
                   </div>
                 </Panel>
               </Group>
             </div>
           </Panel>
 
-          <Separator
-            className="resize-handle resize-handle--horizontal"
-            aria-label="調整主工作區與底部報告高度"
-          />
+          <Separator className="resize-handle resize-handle--horizontal" aria-label="Resize workspace and analysis summary" />
 
-          <Panel id="report-area" defaultSize="28%" minSize="150px" maxSize="48%">
+          <Panel id="analysis-summary" defaultSize="26%" minSize="175px" maxSize="44%">
             <div className="split-panel-content">
-              <Group className="workbench-split-group" orientation="horizontal">
-                <Panel id="gap-report" defaultSize="43%" minSize="340px">
-                  <div className="split-panel-content">
-                    <GapReport currentCase={currentCase} />
-                  </div>
-                </Panel>
-
-                <Separator
-                  className="resize-handle resize-handle--vertical"
-                  aria-label="調整缺口報告與結論比較寬度"
-                />
-
-                <Panel id="conclusion-compare" defaultSize="57%" minSize="420px">
-                  <div className="split-panel-content">
-                    <ConclusionCompare currentCase={currentCase} />
-                  </div>
-                </Panel>
-              </Group>
+              <AnalysisSummary
+                summary={run?.status === 'succeeded' ? run.result?.summary ?? null : null}
+                analysisContext={run?.status === 'succeeded' ? run.result?.analysis_context ?? null : null}
+              />
             </div>
           </Panel>
         </Group>
       </div>
+
+      <RunHistoryDrawer
+        isOpen={isHistoryOpen}
+        runs={runsQuery.data?.runs ?? []}
+        selectedRunId={runId ?? null}
+        isLoading={runsQuery.isLoading}
+        errorMessage={runsQuery.isError ? getApiErrorMessage(runsQuery.error) : null}
+        onRetry={() => void runsQuery.refetch()}
+        onClose={closeHistory}
+      />
     </main>
+  )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Workspace />} />
+      <Route path="/runs/:runId" element={<Workspace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 
