@@ -1,12 +1,22 @@
 import { Activity, CalendarDays, Clock, FileText, Languages } from 'lucide-react'
 import type { RunStatusResponse } from '../contracts'
 import { formatCreatedAt, formatDuration } from '../utils/format'
+import type {
+  GraphSelection,
+  PresentationIndexes,
+} from '../utils/presentation'
+import { ClaimList } from './ClaimList'
 import { ExportActions } from './ExportActions'
 import { RunErrorPanel } from './RunErrorPanel'
 import { RunProgress } from './RunProgress'
+import { SelectionInspector } from './SelectionInspector'
+import { StatementClaimHighlighter } from './StatementClaimHighlighter'
 
 interface RunDetailsProps {
   run: RunStatusResponse | null
+  indexes: PresentationIndexes
+  selection: GraphSelection | null
+  onSelectionChange: (selection: GraphSelection | null) => void
 }
 
 function executionSeconds(run: RunStatusResponse): number | null {
@@ -14,7 +24,12 @@ function executionSeconds(run: RunStatusResponse): number | null {
   return typeof value === 'number' ? value : null
 }
 
-export function RunDetails({ run }: RunDetailsProps) {
+export function RunDetails({
+  run,
+  indexes,
+  selection,
+  onSelectionChange,
+}: RunDetailsProps) {
   if (!run) {
     return (
       <aside className="run-details panel">
@@ -51,9 +66,31 @@ export function RunDetails({ run }: RunDetailsProps) {
         <>
           <section className="statement-section">
             <h3>Original Statement</h3>
-            <p>{run.result.statement.original_text}</p>
+            <StatementClaimHighlighter
+              originalText={run.result.statement.original_text}
+              claims={run.result.claims}
+              selection={selection}
+              onSelect={onSelectionChange}
+            />
           </section>
+          <ClaimList
+            claims={run.result.claims}
+            selection={selection}
+            onSelect={onSelectionChange}
+          />
+          <SelectionInspector
+            selection={selection}
+            indexes={indexes}
+            onSelect={onSelectionChange}
+          />
           <ExportActions runId={run.run_id} />
+          <section className="method-boundary">
+            <h3>Methodological Boundary</h3>
+            <p>Only summarizes the retrieved Top Articles.</p>
+            <p>Not a systematic review.</p>
+            <p>Not a clinical recommendation.</p>
+            <p>Not final medical truth.</p>
+          </section>
         </>
       )}
 

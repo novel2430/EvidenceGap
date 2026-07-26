@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, LoaderCircle, RefreshCw } from 'lucide-react'
 import { Navigate, Route, Routes, useParams } from 'react-router'
@@ -13,11 +13,21 @@ import { RunDetails } from './components/RunDetails'
 import { RunHistoryDrawer } from './components/RunHistoryDrawer'
 import { useRunQuery } from './hooks/useRunQuery'
 import { getApiErrorMessage } from './utils/format'
+import {
+  buildPresentationIndexes,
+  isSelectionValid,
+  type GraphSelection,
+} from './utils/presentation'
 
 function Workspace() {
   const { runId } = useParams<{ runId: string }>()
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [selection, setSelection] = useState<GraphSelection | null>(null)
   const closeHistory = useCallback(() => setIsHistoryOpen(false), [])
+  const handleSelectionChange = useCallback(
+    (nextSelection: GraphSelection | null) => setSelection(nextSelection),
+    [],
+  )
   const queryClient = useQueryClient()
   const runsQuery = useQuery({
     queryKey: ['runs'],
@@ -26,11 +36,27 @@ function Workspace() {
   const runQuery = useRunQuery(runId)
   const run = runQuery.data ?? null
   const runStatus = run?.status
+  const presentation =
+    run?.status === 'succeeded' ? run.result : null
+  const presentationIndexes = useMemo(
+    () => buildPresentationIndexes(presentation),
+    [presentation],
+  )
 
   useEffect(() => {
     if (!runId || !runStatus) return
     void queryClient.invalidateQueries({ queryKey: ['runs'] })
   }, [queryClient, runId, runStatus])
+
+  useEffect(() => {
+    setSelection(null)
+  }, [runId])
+
+  useEffect(() => {
+    if (selection && !isSelectionValid(selection, presentationIndexes)) {
+      setSelection(null)
+    }
+  }, [presentationIndexes, selection])
 
   const runLoadError = runQuery.isError ? getApiErrorMessage(runQuery.error) : null
   const isNotFound = runQuery.error instanceof EvidenceGapApiError && runQuery.error.status === 404
@@ -74,7 +100,13 @@ function Workspace() {
                     )}
 
                     {!runQuery.isLoading && !runLoadError && (
-                      <ClaimGraph presentation={run?.status === 'succeeded' ? run.result : null} />
+                      <ClaimGraph
+                        key={runId ?? 'no-run'}
+                        presentation={presentation}
+                        indexes={presentationIndexes}
+                        selection={selection}
+                        onSelectionChange={handleSelectionChange}
+                      />
                     )}
                   </div>
                 </Panel>
@@ -83,7 +115,12 @@ function Workspace() {
 
                 <Panel id="run-details" defaultSize="27%" minSize="300px" maxSize="42%">
                   <div className="split-panel-content">
-                    <RunDetails run={run} />
+                    <RunDetails
+                      run={run}
+                      indexes={presentationIndexes}
+                      selection={selection}
+                      onSelectionChange={handleSelectionChange}
+                    />
                   </div>
                 </Panel>
               </Group>
