@@ -5,6 +5,7 @@ import type {
   PresentationArticle,
   PresentationClaim,
 } from '../contracts'
+import { UI_TEXT } from '../uiText'
 import {
   getSelectionArticleNodeId,
   type GraphSelection,
@@ -22,13 +23,13 @@ const ARTICLE_GROUPS: Array<{
   stance: ArticleStance
   label: string
 }> = [
-  { stance: 'support', label: 'Supporting' },
-  { stance: 'refute', label: 'Refuting' },
-  { stance: 'insufficient', label: 'Insufficient' },
+  { stance: 'support', label: UI_TEXT.articles.groups.support },
+  { stance: 'refute', label: UI_TEXT.articles.groups.refute },
+  { stance: 'insufficient', label: UI_TEXT.articles.groups.insufficient },
 ]
 
 function formatConfidence(confidence: number): string {
-  if (!Number.isFinite(confidence)) return '—'
+  if (!Number.isFinite(confidence)) return UI_TEXT.common.dash
   return new Intl.NumberFormat(undefined, {
     style: 'percent',
     maximumFractionDigits: 1,
@@ -44,8 +45,10 @@ function ArticleListCard({
   isSelected: boolean
   onSelect: () => void
 }) {
-  const title = article.display_title || article.title || '—'
-  const rationale = article.display_rationale || article.rationale || '—'
+  const title =
+    article.display_title || article.title || UI_TEXT.common.dash
+  const rationale =
+    article.display_rationale || article.rationale || UI_TEXT.common.dash
 
   return (
     <button
@@ -54,19 +57,28 @@ function ArticleListCard({
       onClick={onSelect}
     >
       <span className="article-list-card-heading">
-        <span>Rank {Number.isFinite(article.rank) ? article.rank : '—'}</span>
+        <span>
+          {UI_TEXT.articles.rank(
+            Number.isFinite(article.rank)
+              ? article.rank
+              : UI_TEXT.common.dash,
+          )}
+        </span>
         <span className={`article-stance article-stance--${article.stance}`}>
-          {article.stance}
+          {UI_TEXT.articles.groups[article.stance]}
         </span>
       </span>
       <strong>{title}</strong>
       <span className="article-card-metadata">
-        PMID {article.pmid ?? '—'} · Confidence {formatConfidence(article.confidence)}
+        {UI_TEXT.articles.metadata(
+          article.pmid ?? UI_TEXT.common.dash,
+          formatConfidence(article.confidence),
+        )}
       </span>
       <span className="article-card-rationale">{rationale}</span>
       <span className="article-evidence-count">
         <FileText size={11} />
-        {article.evidence_ids.length} evidence sentence{article.evidence_ids.length === 1 ? '' : 's'}
+        {UI_TEXT.articles.evidenceSentenceCount(article.evidence_ids.length)}
       </span>
     </button>
   )
@@ -98,10 +110,10 @@ export function ClaimArticleList({
   return (
     <section className="claim-articles">
       <div className="inspector-section-heading">
-        <h3>Ranked Articles</h3>
+        <h3>{UI_TEXT.articles.rankedTitle}</h3>
         <span>{articles.length}</span>
       </div>
-      <p className="article-list-boundary">Retrieved Top Articles for this Claim</p>
+      <p className="article-list-boundary">{UI_TEXT.articles.boundary}</p>
       {ARTICLE_GROUPS.map(({ stance, label }) => {
         const groupedArticles = articles.filter(
           (article) => article.stance === stance,
@@ -140,7 +152,7 @@ export function ClaimArticleList({
         )
       })}
       {articles.length === 0 && (
-        <p className="reference-empty">No ranked articles were provided for this Claim.</p>
+        <p className="reference-empty">{UI_TEXT.articles.empty}</p>
       )}
     </section>
   )

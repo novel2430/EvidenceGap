@@ -1,6 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { X } from 'lucide-react'
 import type { RunListItemResponse } from '../contracts'
+import { useModalDrawer } from '../hooks/useModalDrawer'
+import { UI_TEXT } from '../uiText'
 import { RunSidebar } from './RunSidebar'
 
 interface RunHistoryDrawerProps {
@@ -11,6 +13,7 @@ interface RunHistoryDrawerProps {
   errorMessage: string | null
   onRetry: () => void
   onClose: () => void
+  onRunSelected: (runId: string) => void
 }
 
 export function RunHistoryDrawer({
@@ -21,42 +24,38 @@ export function RunHistoryDrawer({
   errorMessage,
   onRetry,
   onClose,
+  onRunSelected,
 }: RunHistoryDrawerProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    if (!isOpen) return
-
-    closeButtonRef.current?.focus()
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
-
-  if (!isOpen) return null
+  const panelRef = useRef<HTMLElement>(null)
+  useModalDrawer(isOpen, panelRef, closeButtonRef, onClose)
 
   return (
-    <div className="history-drawer-layer">
+    <div
+      className={`history-drawer-layer${isOpen ? ' is-open' : ''}`}
+      aria-hidden={!isOpen}
+    >
       <button
         className="history-drawer-backdrop"
         type="button"
-        aria-label="Close Recent Runs"
+        aria-label={UI_TEXT.drawers.closeRecentRuns}
+        tabIndex={-1}
         onClick={onClose}
       />
       <aside
+        ref={panelRef}
         className="history-drawer"
         role="dialog"
         aria-modal="true"
-        aria-label="Recent Runs"
+        aria-label={UI_TEXT.drawers.recentRuns}
+        tabIndex={-1}
+        inert={!isOpen}
       >
         <button
           ref={closeButtonRef}
           className="drawer-close-button"
           type="button"
-          aria-label="Close Recent Runs"
+          aria-label={UI_TEXT.drawers.closeRecentRuns}
           onClick={onClose}
         >
           <X size={18} />
@@ -67,7 +66,7 @@ export function RunHistoryDrawer({
           isLoading={isLoading}
           errorMessage={errorMessage}
           onRetry={onRetry}
-          onRunSelected={onClose}
+          onRunSelected={onRunSelected}
         />
       </aside>
     </div>

@@ -11,16 +11,13 @@ import {
 } from 'lucide-react'
 import { evidenceGapApi } from '../api'
 import type { LocalizationStatusResponse } from '../contracts'
-import { formatCreatedAt, getApiErrorMessage } from '../utils/format'
-
-const COMMON_LANGUAGES = [
-  '繁體中文（台灣）',
-  '简体中文',
-  '日本語',
-  '한국어',
-  'Deutsch',
-  'Français',
-]
+import { useToast } from '../hooks/useToast'
+import { UI_TEXT } from '../uiText'
+import {
+  formatCreatedAt,
+  getApiErrorMessage,
+  getToastErrorMessage,
+} from '../utils/format'
 
 interface LocalizationPanelProps {
   runId: string
@@ -63,15 +60,44 @@ export function LocalizationPanel({
   onRetrySelected,
   onSelectLocalization,
 }: LocalizationPanelProps) {
-  const [targetLanguage, setTargetLanguage] = useState(COMMON_LANGUAGES[0])
+  const [targetLanguage, setTargetLanguage] = useState<string>(
+    UI_TEXT.localization.commonLanguages[0],
+  )
   const [validationError, setValidationError] = useState<string | null>(null)
   const queryClient = useQueryClient()
+  const { showToast, trackOperation } = useToast()
+  const createToastId = `localization-create:${runId}`
   const createLocalization = useMutation({
     mutationFn: (language: string) =>
       evidenceGapApi.createLocalization(runId, { language }),
+    onMutate: (language) => {
+      showToast({
+        id: createToastId,
+        type: 'loading',
+        title: UI_TEXT.toast.localizationCreating,
+        description: UI_TEXT.toast.localizationRequesting(language),
+      })
+    },
     onSuccess: (created) => {
+      trackOperation(
+        `localization:${created.source_run_id}:${created.localization_id}`,
+      )
+      showToast({
+        id: createToastId,
+        type: 'info',
+        title: UI_TEXT.toast.localizationStarted,
+        description: UI_TEXT.toast.localizationGenerating(created.language),
+      })
       void queryClient.invalidateQueries({ queryKey: ['localizations', runId] })
       onSelectLocalization(created.localization_id)
+    },
+    onError: (error) => {
+      showToast({
+        id: createToastId,
+        type: 'error',
+        title: UI_TEXT.toast.localizationStartFailed,
+        description: getToastErrorMessage(error),
+      })
     },
   })
 
@@ -79,7 +105,7 @@ export function LocalizationPanel({
     event.preventDefault()
     const language = targetLanguage.trim()
     if (!language) {
-      setValidationError('Enter a target language.')
+      setValidationError(UI_TEXT.localization.validation)
       return
     }
     setValidationError(null)
@@ -94,8 +120,8 @@ export function LocalizationPanel({
     <section className="localization-panel">
       <div className="progress-heading">
         <div>
-          <span className="eyebrow">Language versions</span>
-          <h2>Localization</h2>
+          <span className="eyebrow">{UI_TEXT.localization.eyebrow}</span>
+          <h2>{UI_TEXT.localization.title}</h2>
         </div>
         <Languages size={17} />
       </div>
@@ -111,18 +137,18 @@ export function LocalizationPanel({
           onClick={() => onSelectLocalization(null)}
         >
           <span className="localization-item-main">
-            <strong>Original</strong>
+            <strong>{UI_TEXT.common.original}</strong>
             <small>{originalLanguage}</small>
           </span>
           <span className="localization-status localization-status--succeeded">
-            <Check size={12} /> Source
+            <Check size={12} /> {UI_TEXT.localization.source}
           </span>
         </button>
 
         {isListLoading && (
           <div className="localization-list-state" role="status">
             <LoaderCircle className="spin" size={14} />
-            Loading language versions…
+            {UI_TEXT.localization.loading}
           </div>
         )}
 
@@ -130,17 +156,17 @@ export function LocalizationPanel({
           <div className="localization-error" role="alert">
             <AlertTriangle size={14} />
             <div>
-              <strong>Language versions could not be loaded</strong>
+              <strong>{UI_TEXT.localization.listLoadFailed}</strong>
               <p>{listErrorMessage}</p>
               <button type="button" onClick={onRetryList}>
-                <RefreshCw size={12} /> Retry
+                <RefreshCw size={12} /> {UI_TEXT.common.retry}
               </button>
             </div>
           </div>
         )}
 
         {!isListLoading && !listErrorMessage && localizations.length === 0 && (
-          <p className="localization-empty">No localizations yet.</p>
+          <p className="localization-empty">{UI_TEXT.localization.empty}</p>
         )}
 
         {localizations.map((listedLocalization) => {
@@ -171,7 +197,7 @@ export function LocalizationPanel({
               </span>
               <span className={`localization-status localization-status--${localization.status}`}>
                 <LocalizationStatusIcon status={localization.status} />
-                {localization.status}
+                {UI_TEXT.statusLabels[localization.status]}
               </span>
             </button>
           )
@@ -186,8 +212,8 @@ export function LocalizationPanel({
             <span>
               <strong>{selectedLocalization.language}</strong>
               {selectedLocalization.status === 'queued'
-                ? ' is waiting to start. Original Analysis remains displayed.'
-                : ' is being localized. Original Analysis remains displayed.'}
+                ? UI_TEXT.localization.queued
+                : UI_TEXT.localization.running}
             </span>
           </div>
         )}
@@ -196,9 +222,15 @@ export function LocalizationPanel({
         <div className="localization-error" role="alert">
           <AlertTriangle size={14} />
           <div>
-            <strong>{selectedLocalization.error?.code ?? 'Localization failed'}</strong>
-            <p>{selectedLocalization.error?.message ?? 'The backend did not provide an error message.'}</p>
-            <small>Original Analysis remains available. Create a new localization to try again.</small>
+            <strong>
+              {selectedLocalization.error?.code ??
+                UI_TEXT.localization.failedFallback}
+            </strong>
+            <p>
+              {selectedLocalization.error?.message ??
+                UI_TEXT.localization.missingError}
+            </p>
+            <small>{UI_TEXT.localization.retryDescription}</small>
           </div>
         </div>
       )}
@@ -207,11 +239,11 @@ export function LocalizationPanel({
         <div className="localization-error" role="alert">
           <AlertTriangle size={14} />
           <div>
-            <strong>Original Analysis displayed</strong>
+            <strong>{UI_TEXT.localization.originalDisplayed}</strong>
             <p>{selectedLoadErrorMessage ?? selectionNotice}</p>
             {selectedLoadErrorMessage && (
               <button type="button" onClick={onRetrySelected}>
-                <RefreshCw size={12} /> Retry
+                <RefreshCw size={12} /> {UI_TEXT.common.retry}
               </button>
             )}
           </div>
@@ -219,7 +251,9 @@ export function LocalizationPanel({
       )}
 
       <form className="localization-form" onSubmit={handleSubmit}>
-        <label htmlFor="target-language">New target language</label>
+        <label htmlFor="target-language">
+          {UI_TEXT.localization.targetLabel}
+        </label>
         <input
           id="target-language"
           list="target-language-options"
@@ -229,7 +263,7 @@ export function LocalizationPanel({
           maxLength={100}
         />
         <datalist id="target-language-options">
-          {COMMON_LANGUAGES.map((language) => (
+          {UI_TEXT.localization.commonLanguages.map((language) => (
             <option value={language} key={language} />
           ))}
         </datalist>
@@ -243,7 +277,9 @@ export function LocalizationPanel({
           ) : (
             <Plus size={13} />
           )}
-          {createLocalization.isPending ? 'Creating…' : 'Create Localization'}
+          {createLocalization.isPending
+            ? UI_TEXT.localization.creating
+            : UI_TEXT.localization.create}
         </button>
         {createError && <p className="form-error" role="alert">{createError}</p>}
       </form>

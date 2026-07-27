@@ -1,5 +1,10 @@
 import type { PresentationClaim } from '../contracts'
+import { UI_TEXT } from '../uiText'
 import type { GraphSelection } from '../utils/presentation'
+import {
+  getInferenceIntegrityLabel,
+  getIntegrityClassName,
+} from '../utils/presentationLabels'
 
 interface ClaimListProps {
   claims: PresentationClaim[]
@@ -17,7 +22,7 @@ export function ClaimList({
   return (
     <section className="claim-list-section">
       <div className="inspector-section-heading">
-        <h3>Claims</h3>
+        <h3>{UI_TEXT.claims.title}</h3>
         <span>{claims.length}</span>
       </div>
       <div className="claim-list">
@@ -40,6 +45,14 @@ export function ClaimList({
                   <span className={`claim-list-state claim-list-state--${claim.evidence_state.toLowerCase()}`}>
                     {claim.evidence_state}
                   </span>
+                  {claim.audit && (
+                    <span className={`claim-list-integrity claim-list-integrity--${getIntegrityClassName(claim.audit.inference_integrity)}`}>
+                      {getInferenceIntegrityLabel(
+                        claim.audit.inference_integrity,
+                        true,
+                      )}
+                    </span>
+                  )}
                 </span>
               </span>
             </button>

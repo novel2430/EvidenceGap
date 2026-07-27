@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { EvidenceState } from '../contracts'
 import type { ClaimGraphNode } from '../graph/types'
+import { UI_TEXT } from '../uiText'
 import {
   getInferenceIntegrityLabel,
   getIntegrityClassName,
@@ -56,11 +57,11 @@ export function ClaimNode({ data }: NodeProps<ClaimGraphNode>) {
       tabIndex={0}
       onClick={selectClaim}
       onKeyDown={handleKeyDown}
-      aria-label={`Claim ${claimNumber}: ${claim.display_text}`}
+      aria-label={UI_TEXT.graph.claimAria(claimNumber, claim.display_text)}
     >
       <Handle type="target" position={Position.Left} />
       <div className="graph-node-heading">
-        <span>Claim {claimNumber}</span>
+        <span>{UI_TEXT.graph.claim(claimNumber)}</span>
         <span className="role-badge">{claim.argument_role}</span>
       </div>
       <p>{claim.display_text}</p>
@@ -75,11 +76,20 @@ export function ClaimNode({ data }: NodeProps<ClaimGraphNode>) {
             {getInferenceIntegrityLabel(inferenceIntegrity, true)}
           </span>
         </div>
-        <span className="article-counts" title="Retrieved Top Articles">
-          S {articleCounts.support} · R {articleCounts.refute} · I {articleCounts.insufficient}
+        <span
+          className="article-counts"
+          title={UI_TEXT.graph.retrievedTopArticles}
+        >
+          {UI_TEXT.graph.articleCounts(
+            articleCounts.support,
+            articleCounts.refute,
+            articleCounts.insufficient,
+          )}
         </span>
       </div>
-      {visual.terminal && <span className="terminal-badge">Terminal claim</span>}
+      {visual.terminal && (
+        <span className="terminal-badge">{UI_TEXT.graph.terminalClaim}</span>
+      )}
       <Handle type="source" position={Position.Right} />
     </div>
   )

@@ -5,6 +5,7 @@ import type {
   InferenceIntegrity,
   InferenceStepIntegrity,
 } from '../contracts'
+import { UI_TEXT } from '../uiText'
 
 export const APPLICABILITY_DIMENSIONS: ReadonlyArray<
   keyof ArticleApplicability
@@ -19,22 +20,8 @@ export const APPLICABILITY_DIMENSIONS: ReadonlyArray<
   'prevention_treatment_scope',
 ]
 
-const APPLICABILITY_DIMENSION_LABELS: Record<
-  keyof ArticleApplicability,
-  string
-> = {
-  population_or_species: 'Population or species',
-  intervention_or_exposure: 'Intervention or exposure',
-  comparator: 'Comparator',
-  outcome: 'Outcome',
-  direction: 'Direction',
-  timeframe: 'Timeframe',
-  causal_strength: 'Causal strength',
-  prevention_treatment_scope: 'Prevention / treatment scope',
-}
-
 export function formatEnumLabel(value: string | null | undefined): string {
-  if (!value?.trim()) return 'Unavailable'
+  if (!value?.trim()) return UI_TEXT.common.unavailable
   return value
     .toLowerCase()
     .split('_')
@@ -46,22 +33,26 @@ export function formatEnumLabel(value: string | null | undefined): string {
 export function getEvidenceStatusLabel(
   status: EvidenceStatus | null | undefined,
 ): string {
-  return status ?? 'Unavailable'
+  return status ?? UI_TEXT.common.unavailable
 }
 
 export function getInferenceIntegrityLabel(
   integrity: InferenceIntegrity | InferenceStepIntegrity | null | undefined,
   compact = false,
 ): string {
-  if (!integrity) return 'Unavailable'
+  if (!integrity) return UI_TEXT.common.unavailable
   if (integrity === 'NOT_APPLICABLE') {
-    return compact ? 'N/A' : 'Not applicable'
+    return compact
+      ? UI_TEXT.presentationLabels.notApplicableCompact
+      : UI_TEXT.presentationLabels.notApplicable
   }
   return integrity
 }
 
 export function getGapTypeLabel(gapType: GapType): string {
-  return gapType === 'SCOPE_GAP' ? 'Scope Gap' : 'Causal Gap'
+  return gapType === 'SCOPE_GAP'
+    ? UI_TEXT.presentationLabels.scopeGap
+    : UI_TEXT.presentationLabels.causalGap
 }
 
 export function getIntegrityClassName(
@@ -75,9 +66,9 @@ export function formatApplicabilityDimension(
 ): string {
   if (
     dimension &&
-    Object.hasOwn(APPLICABILITY_DIMENSION_LABELS, dimension)
+    Object.hasOwn(UI_TEXT.applicability.dimensions, dimension)
   ) {
-    return APPLICABILITY_DIMENSION_LABELS[
+    return UI_TEXT.applicability.dimensions[
       dimension as keyof ArticleApplicability
     ]
   }
@@ -89,15 +80,15 @@ export function getApplicabilityStatusLabel(
 ): string {
   switch (status) {
     case 'MATCH':
-      return 'Match'
+      return UI_TEXT.applicability.statuses.MATCH
     case 'MISMATCH':
-      return 'Mismatch'
+      return UI_TEXT.applicability.statuses.MISMATCH
     case 'NOT_REPORTED':
-      return 'Not reported'
+      return UI_TEXT.applicability.statuses.NOT_REPORTED
     case 'NOT_APPLICABLE':
-      return 'Not applicable'
+      return UI_TEXT.applicability.statuses.NOT_APPLICABLE
     default:
-      return status?.trim() || 'Unavailable'
+      return status?.trim() || UI_TEXT.common.unavailable
   }
 }
 

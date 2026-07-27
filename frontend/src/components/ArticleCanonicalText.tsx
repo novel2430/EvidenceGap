@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import type { ArticleContextResponse } from '../contracts'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 import { segmentTextByOffsets } from '../utils/textSegments'
+import { UI_TEXT } from '../uiText'
 
 interface ArticleCanonicalTextProps {
   context: ArticleContextResponse
@@ -9,7 +11,7 @@ interface ArticleCanonicalTextProps {
 }
 
 function sectionLabel(section: string): string {
-  return section.trim() || 'Section unavailable'
+  return section.trim() || UI_TEXT.common.sectionUnavailable
 }
 
 export function ArticleCanonicalText({
@@ -19,6 +21,7 @@ export function ArticleCanonicalText({
 }: ArticleCanonicalTextProps) {
   const activeSpanRef = useRef<HTMLButtonElement>(null)
   const lastScrolledEvidenceId = useRef<string | null>(null)
+  const reducedMotion = useReducedMotion()
   const segmentedText = useMemo(
     () => segmentTextByOffsets(
       context.canonical_text,
@@ -67,7 +70,7 @@ export function ArticleCanonicalText({
 
     const animationFrame = window.requestAnimationFrame(() => {
       activeSpanRef.current?.scrollIntoView({
-        behavior: 'smooth',
+        behavior: reducedMotion ? 'auto' : 'smooth',
         block: 'center',
         inline: 'nearest',
         container: 'nearest',
@@ -75,7 +78,7 @@ export function ArticleCanonicalText({
       lastScrolledEvidenceId.current = activeEvidenceId
     })
     return () => window.cancelAnimationFrame(animationFrame)
-  }, [activeEvidenceId, context.article_node_id])
+  }, [activeEvidenceId, context.article_node_id, reducedMotion])
 
   function selectOverlappingEvidence(rangeIds: string[]) {
     const activeIndex = activeEvidenceId
@@ -85,7 +88,10 @@ export function ArticleCanonicalText({
   }
 
   return (
-    <div className="canonical-text-scroll" aria-label="Canonical Article Text">
+    <div
+      className="canonical-text-scroll"
+      aria-label={UI_TEXT.articles.canonicalTextLabel}
+    >
       <div className="canonical-text">
         {segmentedText.segments.map((segment) => {
           const text = segmentedText.codePoints

@@ -24,6 +24,8 @@ import type {
   PresentationIndexes,
 } from '../utils/presentation'
 import { getSelectionClaimId } from '../utils/presentation'
+import { useReducedMotion } from '../hooks/useReducedMotion'
+import { UI_TEXT } from '../uiText'
 import { ClaimNode } from './ClaimNode'
 import { InferenceNode } from './InferenceNode'
 
@@ -71,6 +73,7 @@ export function ClaimGraph({
   const [baseEdges, setBaseEdges] = useState<ArgumentGraphEdge[]>([])
   const [isLayoutPending, setIsLayoutPending] = useState(false)
   const [layoutError, setLayoutError] = useState<string | null>(null)
+  const reducedMotion = useReducedMotion()
   const [flowInstance, setFlowInstance] = useState<
     ReactFlowInstance<ArgumentGraphNode, ArgumentGraphEdge> | null
   >(null)
@@ -99,7 +102,9 @@ export function ClaimGraph({
       .catch((error: unknown) => {
         if (cancelled) return
         setLayoutError(
-          error instanceof Error ? error.message : 'Unknown graph layout error',
+          error instanceof Error
+            ? error.message
+            : UI_TEXT.graph.layoutErrorFallback,
         )
         setIsLayoutPending(false)
       })
@@ -111,8 +116,11 @@ export function ClaimGraph({
 
   useEffect(() => {
     if (!flowInstance || baseNodes.length === 0) return
-    void flowInstance.fitView({ padding: 0.16, duration: 300 })
-  }, [baseNodes, flowInstance])
+    void flowInstance.fitView({
+      padding: 0.16,
+      duration: reducedMotion ? 0 : 180,
+    })
+  }, [baseNodes, flowInstance, reducedMotion])
 
   useEffect(() => {
     if (!flowInstance || !selection) return
@@ -127,9 +135,9 @@ export function ClaimGraph({
       nodes: [{ id: nodeId }],
       padding: 0.7,
       maxZoom: 1.15,
-      duration: 350,
+      duration: reducedMotion ? 0 : 180,
     })
-  }, [flowInstance, indexes, selection])
+  }, [flowInstance, indexes, reducedMotion, selection])
 
   const visualState = useMemo(() => {
     const modeNodeIds = new Set<string>()
@@ -303,9 +311,9 @@ export function ClaimGraph({
         <div className="graph-grid" />
         <div className="graph-empty-state" role="status">
           <div className="empty-state-icon"><Network size={24} /></div>
-          <span className="eyebrow">Claim graph</span>
-          <h2>No analysis selected</h2>
-          <p>Submit a biomedical statement or open a recent analysis.</p>
+          <span className="eyebrow">{UI_TEXT.graph.eyebrow}</span>
+          <h2>{UI_TEXT.graph.noSelection}</h2>
+          <p>{UI_TEXT.graph.noSelectionDescription}</p>
         </div>
       </section>
     )
@@ -313,7 +321,10 @@ export function ClaimGraph({
 
   return (
     <section className="graph-panel panel">
-      <div className="graph-focus-toolbar" aria-label="Graph focus mode">
+      <div
+        className="graph-focus-toolbar"
+        aria-label={UI_TEXT.graph.focusModeLabel}
+      >
         {(['all', 'gaps', 'conflicts'] as GraphFocusMode[]).map((mode) => (
           <button
             className={focusMode === mode ? 'is-active' : ''}
@@ -322,24 +333,26 @@ export function ClaimGraph({
             onClick={() => setFocusMode(mode)}
             aria-pressed={focusMode === mode}
           >
-            {mode === 'all' ? 'All' : mode === 'gaps' ? 'Gaps' : 'Conflicts'}
+            {UI_TEXT.graph.focusModes[mode]}
           </button>
         ))}
       </div>
 
       {isLayoutPending ? (
-        <div className="graph-loading" role="status">Laying out argument graph…</div>
+        <div className="graph-loading" role="status">
+          {UI_TEXT.graph.layingOut}
+        </div>
       ) : layoutError ? (
         <div className="graph-empty-state" role="alert">
           <div className="empty-state-icon"><Network size={24} /></div>
-          <h2>Argument graph unavailable</h2>
+          <h2>{UI_TEXT.graph.unavailable}</h2>
           <p>{layoutError}</p>
         </div>
       ) : presentation.claims.length === 0 ? (
         <div className="graph-empty-state" role="status">
           <div className="empty-state-icon"><Network size={24} /></div>
-          <h2>No claims in this analysis</h2>
-          <p>The backend presentation contains no Claim nodes to display.</p>
+          <h2>{UI_TEXT.graph.noClaims}</h2>
+          <p>{UI_TEXT.graph.noClaimsDescription}</p>
         </div>
       ) : (
         <ReactFlow<ArgumentGraphNode, ArgumentGraphEdge>

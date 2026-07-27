@@ -4,6 +4,7 @@ import type {
   InspectorSelection,
   PresentationBundle,
 } from '../contracts'
+import { UI_TEXT } from '../uiText'
 
 interface EvidenceInspectorProps {
   presentation: PresentationBundle | null
@@ -16,19 +17,21 @@ export function EvidenceInspector({
   selection,
   articleContext,
 }: EvidenceInspectorProps) {
-  const selectionLabel = selection ? `Selected ${selection.kind}` : 'Nothing selected'
+  const selectionLabel = selection
+    ? UI_TEXT.inspector.selected(selection.kind)
+    : UI_TEXT.inspector.nothingSelected
   const detailText = articleContext
-    ? `Article context loaded for ${articleContext.article_id}.`
+    ? UI_TEXT.inspector.articleLoaded(articleContext.article_id)
     : presentation
-      ? 'Select a claim, inference step, article, or evidence item.'
-      : 'Select an item after a completed run is loaded.'
+      ? UI_TEXT.inspector.selectItem
+      : UI_TEXT.inspector.selectAfterRun
 
   return (
     <aside className="inspector panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Inspector</span>
-          <h2>Evidence details</h2>
+          <span className="eyebrow">{UI_TEXT.inspector.legacyEyebrow}</span>
+          <h2>{UI_TEXT.inspector.legacyTitle}</h2>
         </div>
         <PanelRight size={18} />
       </div>

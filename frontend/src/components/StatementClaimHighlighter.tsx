@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { PresentationClaim } from '../contracts'
 import type { GraphSelection } from '../utils/presentation'
 import { segmentTextByOffsets } from '../utils/textSegments'
+import { UI_TEXT } from '../uiText'
 
 interface StatementClaimHighlighterProps {
   originalText: string
@@ -60,7 +61,10 @@ export function StatementClaimHighlighter({
             type="button"
             key={`${segment.start}-${segment.end}`}
             onClick={() => selectOverlappingClaim(segment.rangeIds)}
-            aria-label={`Select ${segment.rangeIds.length === 1 ? 'claim' : 'overlapping claim'}: ${text}`}
+            aria-label={UI_TEXT.claims.selectSpan(
+              segment.rangeIds.length > 1,
+              text,
+            )}
           >
             {text}
           </button>

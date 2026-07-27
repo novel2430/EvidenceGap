@@ -1,6 +1,7 @@
 import { History, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import type { RunListItemResponse } from '../contracts'
+import { UI_TEXT } from '../uiText'
 import { formatCreatedAt, formatDuration } from '../utils/format'
 
 interface RunSidebarProps {
@@ -9,7 +10,7 @@ interface RunSidebarProps {
   isLoading: boolean
   errorMessage: string | null
   onRetry: () => void
-  onRunSelected?: () => void
+  onRunSelected?: (runId: string) => void
 }
 
 export function RunSidebar({
@@ -24,31 +25,38 @@ export function RunSidebar({
 
   function openRun(runId: string) {
     navigate(`/runs/${encodeURIComponent(runId)}`)
-    onRunSelected?.()
+    onRunSelected?.(runId)
   }
 
   return (
     <section className="sidebar panel">
       <div className="panel-heading">
-        <div><span className="eyebrow">Workspace</span><h2>Recent Runs</h2></div>
+        <div>
+          <span className="eyebrow">{UI_TEXT.history.eyebrow}</span>
+          <h2>{UI_TEXT.history.title}</h2>
+        </div>
         <History size={18} />
       </div>
 
-      {isLoading && <div className="sidebar-message">Loading recent analyses…</div>}
+      {isLoading && (
+        <div className="sidebar-message">{UI_TEXT.history.loading}</div>
+      )}
 
       {errorMessage && (
         <div className="sidebar-error" role="alert">
-          <strong>Could not load Recent Runs</strong>
+          <strong>{UI_TEXT.history.loadFailed}</strong>
           <p>{errorMessage}</p>
-          <button type="button" onClick={onRetry}><RefreshCw size={14} /> Retry</button>
+          <button type="button" onClick={onRetry}>
+            <RefreshCw size={14} /> {UI_TEXT.common.retry}
+          </button>
         </div>
       )}
 
       {!isLoading && !errorMessage && runs.length === 0 && (
         <div className="empty-card empty-card--compact">
           <History size={20} />
-          <strong>No analyses yet</strong>
-          <p>Your completed and in-progress runs will appear here.</p>
+          <strong>{UI_TEXT.history.emptyTitle}</strong>
+          <p>{UI_TEXT.history.emptyDescription}</p>
         </div>
       )}
 
@@ -66,14 +74,16 @@ export function RunSidebar({
             >
               <div className="run-item-topline">
                 <span className={`status-dot status-dot--${run.status}`} />
-                <span className={`run-status run-status--${run.status}`}>{run.status}</span>
+                <span className={`run-status run-status--${run.status}`}>
+                  {UI_TEXT.statusLabels[run.status]}
+                </span>
                 <time>{formatCreatedAt(run.created_at)}</time>
               </div>
               <p>{run.statement_preview}</p>
               <dl className="run-item-metrics">
-                <div><dt>Claims</dt><dd>{run.summary?.total_claims ?? '—'}</dd></div>
-                <div><dt>Gaps</dt><dd>{gaps ?? '—'}</dd></div>
-                <div><dt>Time</dt><dd>{formatDuration(run.total_seconds)}</dd></div>
+                <div><dt>{UI_TEXT.history.metrics.claims}</dt><dd>{run.summary?.total_claims ?? UI_TEXT.common.dash}</dd></div>
+                <div><dt>{UI_TEXT.history.metrics.gaps}</dt><dd>{gaps ?? UI_TEXT.common.dash}</dd></div>
+                <div><dt>{UI_TEXT.history.metrics.time}</dt><dd>{formatDuration(run.total_seconds)}</dd></div>
               </dl>
             </button>
           )

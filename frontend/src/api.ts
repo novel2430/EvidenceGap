@@ -11,6 +11,7 @@ import type {
   RunListResponse,
   RunStatusResponse,
 } from './contracts'
+import { UI_TEXT } from './uiText'
 
 export const DEFAULT_API_BASE_URL =
   'https://www.next.zju.edu.cn/novel-evidencegap/back/'
@@ -46,7 +47,7 @@ export class EvidenceGapApiError extends Error {
 function normalizeBaseUrl(value: string): string {
   const trimmed = value.trim()
   if (!trimmed) {
-    throw new Error('EvidenceGap API base URL must not be blank')
+    throw new Error(UI_TEXT.errors.apiBaseBlank)
   }
 
   const fallbackOrigin =
@@ -81,7 +82,7 @@ function formatErrorDetail(detail: unknown, fallback: string): string {
     }
   }
 
-  return fallback || 'EvidenceGap API request failed'
+  return fallback || UI_TEXT.errors.apiRequestFailed
 }
 
 async function buildApiError(response: Response): Promise<EvidenceGapApiError> {

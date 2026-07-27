@@ -1,4 +1,5 @@
 import type { PresentationArticle, PresentationClaim } from '../contracts'
+import { UI_TEXT } from '../uiText'
 import { countArticleStances } from '../utils/presentation'
 
 interface EvidenceBalanceProps {
@@ -14,14 +15,20 @@ export function EvidenceBalance({ claim, articles }: EvidenceBalanceProps) {
   return (
     <section className={`evidence-balance${claim.evidence_state === 'CONFLICTED' ? ' evidence-balance--conflicted' : ''}`}>
       <div className="inspector-section-heading">
-        <h3>Evidence Balance</h3>
-        <span>{counts.total} articles</span>
+        <h3>{UI_TEXT.evidenceBalance.title}</h3>
+        <span>{UI_TEXT.evidenceBalance.articleCount(counts.total)}</span>
       </div>
-      <p className="balance-boundary">Retrieved Top Articles distribution</p>
+      <p className="balance-boundary">
+        {UI_TEXT.evidenceBalance.boundary}
+      </p>
       <div
         className="balance-bar"
         role="img"
-        aria-label={`${counts.support} supporting, ${counts.refute} refuting, and ${counts.insufficient} insufficient articles`}
+        aria-label={UI_TEXT.evidenceBalance.aria(
+          counts.support,
+          counts.refute,
+          counts.insufficient,
+        )}
       >
         <span
           className="balance-bar-segment balance-bar-segment--support"
@@ -37,9 +44,9 @@ export function EvidenceBalance({ claim, articles }: EvidenceBalanceProps) {
         />
       </div>
       <dl className="balance-legend">
-        <div><dt><span className="balance-key balance-key--support" />Supporting</dt><dd>{counts.support}</dd></div>
-        <div><dt><span className="balance-key balance-key--refute" />Refuting</dt><dd>{counts.refute}</dd></div>
-        <div><dt><span className="balance-key balance-key--insufficient" />Insufficient</dt><dd>{counts.insufficient}</dd></div>
+        <div><dt><span className="balance-key balance-key--support" />{UI_TEXT.evidenceBalance.supporting}</dt><dd>{counts.support}</dd></div>
+        <div><dt><span className="balance-key balance-key--refute" />{UI_TEXT.evidenceBalance.refuting}</dt><dd>{counts.refute}</dd></div>
+        <div><dt><span className="balance-key balance-key--insufficient" />{UI_TEXT.evidenceBalance.insufficient}</dt><dd>{counts.insufficient}</dd></div>
       </dl>
     </section>
   )

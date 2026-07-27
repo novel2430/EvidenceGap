@@ -3,6 +3,7 @@ import type { NodeProps } from '@xyflow/react'
 import { Handle, Position } from '@xyflow/react'
 import { GitMerge, Route, TriangleAlert } from 'lucide-react'
 import type { InferenceGraphNode } from '../graph/types'
+import { UI_TEXT } from '../uiText'
 import {
   getGapTypeLabel,
   getInferenceIntegrityLabel,
@@ -53,13 +54,19 @@ export function InferenceNode({ data }: NodeProps<InferenceGraphNode>) {
       tabIndex={0}
       onClick={selectInference}
       onKeyDown={handleKeyDown}
-      aria-label={`Inference step ${stepNumber}`}
+      aria-label={UI_TEXT.graph.inferenceAria(stepNumber)}
     >
       <Handle type="target" position={Position.Left} />
       <div className="graph-node-heading">
-        <span><GitMerge size={13} /> Inference Step {stepNumber}</span>
+        <span>
+          <GitMerge size={13} /> {UI_TEXT.graph.inferenceStep(stepNumber)}
+        </span>
       </div>
-      <p>{inferenceStep.premise_claim_ids.length} premise{inferenceStep.premise_claim_ids.length === 1 ? '' : 's'} → 1 conclusion</p>
+      <p>
+        {UI_TEXT.graph.inferenceRelation(
+          inferenceStep.premise_claim_ids.length,
+        )}
+      </p>
       <div className="inference-integrity-row">
         <span className={`inference-integrity-badge inference-integrity-badge--${getIntegrityClassName(inferenceStep.inference_integrity)}`}>
           <Route size={11} />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, LoaderCircle, RefreshCw } from 'lucide-react'
 import {
@@ -11,18 +11,23 @@ import {
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import './App.css'
 import { evidenceGapApi, EvidenceGapApiError } from './api'
-import { AnalysisForm } from './components/AnalysisForm'
-import { AnalysisSummary } from './components/AnalysisSummary'
 import { ClaimGraph } from './components/ClaimGraph'
 import { Header } from './components/Header'
-import { RunDetails } from './components/RunDetails'
+import { NewAnalysisDrawer } from './components/NewAnalysisDrawer'
+import {
+  RunDetails,
+  type DetailsTab,
+} from './components/RunDetails'
 import { RunHistoryDrawer } from './components/RunHistoryDrawer'
+import { useToast } from './hooks/useToast'
 import { useRunQuery } from './hooks/useRunQuery'
 import {
   useLocalizationList,
   useLocalizationQuery,
 } from './hooks/useLocalizations'
-import { getApiErrorMessage } from './utils/format'
+import { getApiErrorMessage, getToastErrorMessage } from './utils/format'
+import { RUN_STAGE_LABELS } from './utils/run'
+import { UI_TEXT } from './uiText'
 import {
   buildPresentationIndexes,
   getSelectionClaimId,
@@ -30,14 +35,59 @@ import {
   type GraphSelection,
 } from './utils/presentation'
 
+function isSameSelection(
+  current: GraphSelection | null,
+  next: GraphSelection | null,
+) {
+  if (current?.kind !== next?.kind) return false
+  if (!current || !next) return current === next
+  if (current.kind === 'claim' && next.kind === 'claim') {
+    return current.claimId === next.claimId
+  }
+  if (
+    current.kind === 'inference_step' &&
+    next.kind === 'inference_step'
+  ) {
+    return current.inferenceStepId === next.inferenceStepId
+  }
+  if (current.kind === 'gap' && next.kind === 'gap') {
+    return current.inferenceStepId === next.inferenceStepId &&
+      current.gapIndex === next.gapIndex
+  }
+  if (current.kind === 'article' && next.kind === 'article') {
+    return current.articleNodeId === next.articleNodeId
+  }
+  return current.kind === 'evidence' &&
+    next.kind === 'evidence' &&
+    current.evidenceId === next.evidenceId
+}
+
 function Workspace() {
   const { runId } = useParams<{ runId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [isNewAnalysisOpen, setIsNewAnalysisOpen] = useState(() => !runId)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [selection, setSelection] = useState<GraphSelection | null>(null)
+  const [activeDetailsTab, setActiveDetailsTab] =
+    useState<DetailsTab>(runId ? 'run' : 'overview')
+  const observedRunStatuses = useRef(new Map<string, string>())
+  const observedLocalizationStatuses = useRef(new Map<string, string>())
+  const {
+    isOperationTracked,
+    notifyOnce,
+    untrackOperation,
+  } = useToast()
+  const closeNewAnalysis = useCallback(
+    () => setIsNewAnalysisOpen(false),
+    [],
+  )
   const closeHistory = useCallback(() => setIsHistoryOpen(false), [])
   const handleSelectionChange = useCallback(
-    (nextSelection: GraphSelection | null) => setSelection(nextSelection),
+    (nextSelection: GraphSelection | null) => {
+      setSelection((current) =>
+        isSameSelection(current, nextSelection) ? current : nextSelection)
+      if (nextSelection) setActiveDetailsTab('inspect')
+    },
     [],
   )
   const queryClient = useQueryClient()
@@ -84,6 +134,15 @@ function Workspace() {
   )
   const handleSelectLocalization = useCallback(
     (localizationId: string | null) => {
+      if (
+        runId &&
+        selectedLocalizationId &&
+        localizationId !== selectedLocalizationId
+      ) {
+        untrackOperation(
+          `localization:${runId}:${selectedLocalizationId}`,
+        )
+      }
       const nextSearchParams = new URLSearchParams(searchParams)
       if (localizationId) {
         nextSearchParams.set('localization', localizationId)
@@ -92,7 +151,13 @@ function Workspace() {
       }
       setSearchParams(nextSearchParams)
     },
-    [searchParams, setSearchParams],
+    [
+      runId,
+      searchParams,
+      selectedLocalizationId,
+      setSearchParams,
+      untrackOperation,
+    ],
   )
 
   useEffect(() => {
@@ -101,8 +166,44 @@ function Workspace() {
   }, [queryClient, runId, runStatus])
 
   useEffect(() => {
+    if (!run) return
+    const operationKey = `run:${run.run_id}`
+    const previousStatus = observedRunStatuses.current.get(run.run_id)
+    observedRunStatuses.current.set(run.run_id, run.status)
+    if (!isOperationTracked(operationKey)) return
+
+    if (run.status === 'succeeded' && previousStatus !== 'succeeded') {
+      const claimCount = run.result?.claims.length
+      notifyOnce(`${operationKey}:succeeded`, {
+        type: 'success',
+        title: UI_TEXT.toast.analysisCompleted,
+        description: typeof claimCount === 'number'
+          ? UI_TEXT.toast.analyzedClaims(claimCount)
+          : UI_TEXT.toast.resultsReady,
+      })
+    } else if (run.status === 'failed' && previousStatus !== 'failed') {
+      const stage = run.progress?.stage
+      notifyOnce(`${operationKey}:failed`, {
+        type: 'error',
+        title: UI_TEXT.toast.analysisFailed,
+        description: stage
+          ? UI_TEXT.toast.stoppedDuring(RUN_STAGE_LABELS[stage])
+          : UI_TEXT.toast.stoppedBeforeComplete,
+      })
+    }
+  }, [isOperationTracked, notifyOnce, run])
+
+  useEffect(() => {
     setSelection(null)
   }, [runId])
+
+  useEffect(() => {
+    if (!runId) setIsNewAnalysisOpen(true)
+  }, [runId])
+
+  useEffect(() => {
+    setActiveDetailsTab(runStatus === 'succeeded' ? 'overview' : 'run')
+  }, [runId, runStatus])
 
   useEffect(() => {
     if (!selection || isSelectionValid(selection, presentationIndexes)) return
@@ -155,119 +256,171 @@ function Workspace() {
     })
   }, [queryClient, runId, selectedLocalization?.status])
 
+  useEffect(() => {
+    if (!selectedLocalization) return
+    const operationKey =
+      `localization:${selectedLocalization.source_run_id}:${selectedLocalization.localization_id}`
+    const previousStatus = observedLocalizationStatuses.current.get(
+      operationKey,
+    )
+    observedLocalizationStatuses.current.set(
+      operationKey,
+      selectedLocalization.status,
+    )
+    if (!isOperationTracked(operationKey)) return
+
+    if (
+      selectedLocalization.status === 'succeeded' &&
+      previousStatus !== 'succeeded'
+    ) {
+      notifyOnce(`${operationKey}:succeeded`, {
+        type: 'success',
+        title: UI_TEXT.toast.localizationReady,
+        description: UI_TEXT.toast.localizationDisplayed(
+          selectedLocalization.language,
+        ),
+      })
+    } else if (
+      selectedLocalization.status === 'failed' &&
+      previousStatus !== 'failed'
+    ) {
+      notifyOnce(`${operationKey}:failed`, {
+        type: 'error',
+        title: UI_TEXT.toast.localizationFailed,
+        description: getToastErrorMessage(
+          selectedLocalization.error?.message ??
+          UI_TEXT.toast.localizationCouldNotGenerate(
+            selectedLocalization.language,
+          ),
+        ),
+      })
+    }
+  }, [
+    isOperationTracked,
+    notifyOnce,
+    selectedLocalization,
+  ])
+
+  useEffect(() => {
+    if (!isNewAnalysisOpen && !isHistoryOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isHistoryOpen, isNewAnalysisOpen])
+
   const runLoadError = runQuery.isError ? getApiErrorMessage(runQuery.error) : null
   const isNotFound = runQuery.error instanceof EvidenceGapApiError && runQuery.error.status === 404
   const localizationSelectionNotice =
     selectedLocalizationQuery.isSuccess &&
     selectedLocalizationQuery.data.source_run_id !== runId
-      ? 'The requested localization does not belong to this Run.'
+      ? UI_TEXT.localization.invalidSelection
       : selectedLocalization?.status === 'succeeded' &&
           !selectedLocalization.result
-        ? 'The requested localization completed without a presentation result.'
+        ? UI_TEXT.localization.missingResult
         : null
 
   return (
     <main className="workbench-shell">
-      <Header run={run} onOpenHistory={() => setIsHistoryOpen(true)} />
+      <Header
+        run={run}
+        onOpenNewAnalysis={() => {
+          setIsHistoryOpen(false)
+          setIsNewAnalysisOpen(true)
+        }}
+        onOpenHistory={() => {
+          setIsNewAnalysisOpen(false)
+          setIsHistoryOpen(true)
+        }}
+      />
 
       <div className="workbench-body">
-        <Group className="workbench-split-group" orientation="vertical">
-          <Panel id="workspace" defaultSize="74%" minSize="410px">
-            <div className="split-panel-content">
-              <Group className="workbench-split-group" orientation="horizontal">
-                <Panel id="new-analysis" defaultSize="25%" minSize="280px" maxSize="36%">
-                  <div className="split-panel-content">
-                    <AnalysisForm />
-                  </div>
-                </Panel>
+        <Group className="workbench-split-group" orientation="horizontal">
+          <Panel id="graph-workspace" defaultSize="70%" minSize="560px">
+            <div className="center-result">
+              {runQuery.isLoading && (
+                <section className="load-state panel" role="status">
+                  <LoaderCircle className="spin" size={24} />
+                  <h2>{UI_TEXT.workspace.loadingRun}</h2>
+                  <p>{UI_TEXT.workspace.loadingRunDescription}</p>
+                </section>
+              )}
 
-                <Separator className="resize-handle resize-handle--vertical" aria-label="Resize new analysis and graph workspace" />
+              {runLoadError && (
+                <section className="load-state load-state--error panel" role="alert">
+                  <AlertCircle size={24} />
+                  <h2>
+                    {isNotFound
+                      ? UI_TEXT.workspace.runNotFound
+                      : UI_TEXT.workspace.runLoadFailed}
+                  </h2>
+                  <p>{runLoadError}</p>
+                  <button className="secondary-button" type="button" onClick={() => void runQuery.refetch()}>
+                    <RefreshCw size={15} /> {UI_TEXT.common.retry}
+                  </button>
+                </section>
+              )}
 
-                <Panel id="graph-workspace" defaultSize="48%" minSize="500px">
-                  <div className="center-result">
-                    {runQuery.isLoading && (
-                      <section className="load-state panel" role="status">
-                        <LoaderCircle className="spin" size={24} />
-                        <h2>Loading analysis run</h2>
-                        <p>Retrieving the current backend state…</p>
-                      </section>
-                    )}
-
-                    {runLoadError && (
-                      <section className="load-state load-state--error panel" role="alert">
-                        <AlertCircle size={24} />
-                        <h2>{isNotFound ? 'Run not found' : 'Run could not be loaded'}</h2>
-                        <p>{runLoadError}</p>
-                        <button className="secondary-button" type="button" onClick={() => void runQuery.refetch()}>
-                          <RefreshCw size={15} /> Retry
-                        </button>
-                      </section>
-                    )}
-
-                    {!runQuery.isLoading && !runLoadError && (
-                      <ClaimGraph
-                        key={runId ?? 'no-run'}
-                        presentation={activePresentation}
-                        indexes={presentationIndexes}
-                        selection={selection}
-                        onSelectionChange={handleSelectionChange}
-                      />
-                    )}
-                  </div>
-                </Panel>
-
-                <Separator className="resize-handle resize-handle--vertical" aria-label="Resize analysis workspace and run details" />
-
-                <Panel id="run-details" defaultSize="27%" minSize="300px" maxSize="42%">
-                  <div className="split-panel-content">
-                    <RunDetails
-                      run={run}
-                      sourcePresentation={sourcePresentation}
-                      activePresentation={activePresentation}
-                      localizationList={localizationListQuery.data?.localizations ?? []}
-                      selectedLocalizationId={selectedLocalizationId}
-                      activeLocalizationId={activeLocalization?.localization_id ?? null}
-                      selectedLocalization={selectedLocalization}
-                      isLocalizationListLoading={localizationListQuery.isLoading}
-                      localizationListErrorMessage={
-                        localizationListQuery.isError
-                          ? getApiErrorMessage(localizationListQuery.error)
-                          : null
-                      }
-                      selectedLocalizationLoadErrorMessage={
-                        selectedLocalizationQuery.isError
-                          ? getApiErrorMessage(selectedLocalizationQuery.error)
-                          : null
-                      }
-                      localizationSelectionNotice={localizationSelectionNotice}
-                      onRetryLocalizationList={() =>
-                        void localizationListQuery.refetch()}
-                      onRetrySelectedLocalization={() =>
-                        void selectedLocalizationQuery.refetch()}
-                      onSelectLocalization={handleSelectLocalization}
-                      indexes={presentationIndexes}
-                      selection={selection}
-                      onSelectionChange={handleSelectionChange}
-                    />
-                  </div>
-                </Panel>
-              </Group>
+              {!runQuery.isLoading && !runLoadError && (
+                <ClaimGraph
+                  key={runId ?? 'no-run'}
+                  presentation={activePresentation}
+                  indexes={presentationIndexes}
+                  selection={selection}
+                  onSelectionChange={handleSelectionChange}
+                />
+              )}
             </div>
           </Panel>
 
-          <Separator className="resize-handle resize-handle--horizontal" aria-label="Resize workspace and analysis summary" />
+          <Separator
+            className="resize-handle resize-handle--vertical"
+            aria-label={UI_TEXT.workspace.resizePanels}
+          />
 
-          <Panel id="analysis-summary" defaultSize="26%" minSize="175px" maxSize="44%">
+          <Panel id="run-details" defaultSize="30%" minSize="340px" maxSize="46%">
             <div className="split-panel-content">
-              <AnalysisSummary
-                summary={activePresentation?.summary ?? null}
-                analysisContext={activePresentation?.analysis_context ?? null}
+              <RunDetails
+                run={run}
+                sourcePresentation={sourcePresentation}
+                activePresentation={activePresentation}
+                localizationList={localizationListQuery.data?.localizations ?? []}
+                selectedLocalizationId={selectedLocalizationId}
+                activeLocalizationId={activeLocalization?.localization_id ?? null}
+                selectedLocalization={selectedLocalization}
+                isLocalizationListLoading={localizationListQuery.isLoading}
+                localizationListErrorMessage={
+                  localizationListQuery.isError
+                    ? getApiErrorMessage(localizationListQuery.error)
+                    : null
+                }
+                selectedLocalizationLoadErrorMessage={
+                  selectedLocalizationQuery.isError
+                    ? getApiErrorMessage(selectedLocalizationQuery.error)
+                    : null
+                }
+                localizationSelectionNotice={localizationSelectionNotice}
+                onRetryLocalizationList={() =>
+                  void localizationListQuery.refetch()}
+                onRetrySelectedLocalization={() =>
+                  void selectedLocalizationQuery.refetch()}
+                onSelectLocalization={handleSelectLocalization}
+                indexes={presentationIndexes}
+                selection={selection}
+                onSelectionChange={handleSelectionChange}
+                activeTab={activeDetailsTab}
+                onTabChange={setActiveDetailsTab}
               />
             </div>
           </Panel>
         </Group>
       </div>
 
+      <NewAnalysisDrawer
+        isOpen={isNewAnalysisOpen}
+        onClose={closeNewAnalysis}
+      />
       <RunHistoryDrawer
         isOpen={isHistoryOpen}
         runs={runsQuery.data?.runs ?? []}
@@ -276,6 +429,12 @@ function Workspace() {
         errorMessage={runsQuery.isError ? getApiErrorMessage(runsQuery.error) : null}
         onRetry={() => void runsQuery.refetch()}
         onClose={closeHistory}
+        onRunSelected={(nextRunId) => {
+          if (runId && nextRunId !== runId) {
+            untrackOperation(`run:${runId}`)
+          }
+          closeHistory()
+        }}
       />
     </main>
   )

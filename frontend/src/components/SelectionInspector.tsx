@@ -8,6 +8,7 @@ import type {
   GraphSelection,
   PresentationIndexes,
 } from '../utils/presentation'
+import { UI_TEXT } from '../uiText'
 import { ArticleInspector } from './ArticleInspector'
 import { ClaimArticleList } from './ClaimArticleList'
 import { EvidenceBalance } from './EvidenceBalance'
@@ -37,7 +38,7 @@ function ClaimReferenceList({
   claimIds,
   indexes,
   onSelect,
-  emptyLabel = 'None',
+  emptyLabel = UI_TEXT.inspector.none,
 }: ClaimReferenceListProps) {
   if (claimIds.length === 0) return <p className="reference-empty">{emptyLabel}</p>
 
@@ -97,7 +98,10 @@ function StructuredGapCard({
   gap: PresentationGap
   onSelect?: () => void
 }) {
-  const reason = gap.display_reason?.trim() || gap.reason_en?.trim() || 'Unavailable'
+  const reason =
+    gap.display_reason?.trim() ||
+    gap.reason_en?.trim() ||
+    UI_TEXT.common.unavailable
   const closureRequirement =
     gap.display_closure_requirement?.trim() ||
     gap.closure_requirement_en?.trim() ||
@@ -131,7 +135,7 @@ function StructuredGapCard({
 
       {gap.affected_dimensions && gap.affected_dimensions.length > 0 && (
         <div className="gap-detail-block">
-          <h5>Affected dimensions</h5>
+          <h5>{UI_TEXT.inspector.affectedDimensions}</h5>
           <div className="gap-dimension-chips">
             {gap.affected_dimensions.map((dimension) => (
               <span key={dimension}>{formatEnumLabel(dimension)}</span>
@@ -143,24 +147,29 @@ function StructuredGapCard({
       {hasBasisPair && (
         <div className="gap-basis-pair">
           <div>
-            <h5>Supported by premises</h5>
-            <p>{gap.supported_basis?.trim() || 'Unavailable'}</p>
+            <h5>{UI_TEXT.inspector.supportedByPremises}</h5>
+            <p>
+              {gap.supported_basis?.trim() || UI_TEXT.common.unavailable}
+            </p>
           </div>
           <div>
-            <h5>Unsupported extension</h5>
-            <p>{gap.unsupported_extension?.trim() || 'Unavailable'}</p>
+            <h5>{UI_TEXT.inspector.unsupportedExtension}</h5>
+            <p>
+              {gap.unsupported_extension?.trim() ||
+                UI_TEXT.common.unavailable}
+            </p>
           </div>
         </div>
       )}
 
       <div className="gap-detail-block">
-        <h5>Why this is a gap</h5>
+        <h5>{UI_TEXT.inspector.whyGap}</h5>
         <p>{reason}</p>
       </div>
 
       {closureRequirement && (
         <div className="gap-closure-requirement">
-          <h5>Evidence needed to close the gap</h5>
+          <h5>{UI_TEXT.inspector.closureRequirement}</h5>
           <p>{closureRequirement}</p>
         </div>
       )}
@@ -180,27 +189,27 @@ function ImpactDetails({
   const impact = inferenceStep.impact
   return (
     <div className="impact-details">
-      <h4>Direct conclusion</h4>
+      <h4>{UI_TEXT.inspector.directConclusion}</h4>
       <ClaimReferenceList
         claimIds={[impact.direct_conclusion_claim_id]}
         indexes={indexes}
         onSelect={onSelect}
       />
-      <h4>Downstream claims</h4>
+      <h4>{UI_TEXT.inspector.downstreamClaims}</h4>
       <ClaimReferenceList
         claimIds={impact.downstream_claim_ids}
         indexes={indexes}
         onSelect={onSelect}
       />
-      <h4>Terminal claims</h4>
+      <h4>{UI_TEXT.inspector.terminalClaims}</h4>
       <ClaimReferenceList
         claimIds={impact.terminal_claim_ids}
         indexes={indexes}
         onSelect={onSelect}
       />
       <dl className="impact-summary">
-        <div><dt>Downstream inference steps</dt><dd>{impact.downstream_inference_step_ids.length}</dd></div>
-        <div><dt>Affects terminal conclusion</dt><dd>{impact.affects_terminal_conclusion ? 'Yes' : 'No'}</dd></div>
+        <div><dt>{UI_TEXT.inspector.downstreamSteps}</dt><dd>{impact.downstream_inference_step_ids.length}</dd></div>
+        <div><dt>{UI_TEXT.inspector.affectsTerminal}</dt><dd>{impact.affects_terminal_conclusion ? UI_TEXT.common.yes : UI_TEXT.common.no}</dd></div>
       </dl>
     </div>
   )
@@ -220,30 +229,30 @@ function ClaimDetails({
   return (
     <section className="selection-card">
       <div className="selection-card-heading">
-        <span className="eyebrow">Claim selection</span>
+        <span className="eyebrow">{UI_TEXT.inspector.claimSelection}</span>
         <span className={`claim-list-state claim-list-state--${claim.evidence_state.toLowerCase()}`}>
           {claim.evidence_state}
         </span>
       </div>
       <h3>{claim.display_text}</h3>
       <dl className="claim-detail-fields">
-        <div><dt>Original quote</dt><dd>{claim.source_text}</dd></div>
-        <div><dt>Canonical English Claim</dt><dd>{claim.canonical_claim_en}</dd></div>
-        <div><dt>Display text</dt><dd>{claim.display_text}</dd></div>
-        <div><dt>Argument Role</dt><dd>{claim.argument_role}</dd></div>
-        <div><dt>Evidence State</dt><dd>{claim.evidence_state}</dd></div>
+        <div><dt>{UI_TEXT.inspector.fields.originalQuote}</dt><dd>{claim.source_text}</dd></div>
+        <div><dt>{UI_TEXT.inspector.fields.canonicalClaim}</dt><dd>{claim.canonical_claim_en}</dd></div>
+        <div><dt>{UI_TEXT.inspector.fields.displayText}</dt><dd>{claim.display_text}</dd></div>
+        <div><dt>{UI_TEXT.inspector.fields.argumentRole}</dt><dd>{claim.argument_role}</dd></div>
+        <div><dt>{UI_TEXT.inspector.fields.evidenceState}</dt><dd>{claim.evidence_state}</dd></div>
       </dl>
       <section className="argument-audit">
-        <h4>Argument Audit</h4>
+        <h4>{UI_TEXT.inspector.argumentAudit}</h4>
         {claim.audit ? (
           <>
             <dl>
               <div>
-                <dt>Evidence Status</dt>
+                <dt>{UI_TEXT.inspector.fields.evidenceStatus}</dt>
                 <dd>{getEvidenceStatusLabel(claim.audit.evidence_status)}</dd>
               </div>
               <div>
-                <dt>Inference Integrity</dt>
+                <dt>{UI_TEXT.inspector.fields.inferenceIntegrity}</dt>
                 <dd>
                   <span className={`inference-integrity-badge inference-integrity-badge--${getIntegrityClassName(claim.audit.inference_integrity)}`}>
                     <Route size={11} />
@@ -254,7 +263,7 @@ function ClaimDetails({
             </dl>
             {claim.audit.affecting_inference_step_ids.length > 0 && (
               <>
-                <h5>Affecting Inference Steps</h5>
+                <h5>{UI_TEXT.inspector.affectingSteps}</h5>
                 <InferenceStepReferenceList
                   inferenceStepIds={claim.audit.affecting_inference_step_ids}
                   indexes={indexes}
@@ -264,7 +273,9 @@ function ClaimDetails({
             )}
           </>
         ) : (
-          <p className="reference-empty">Argument audit unavailable for this Run.</p>
+          <p className="reference-empty">
+            {UI_TEXT.inspector.auditUnavailable}
+          </p>
         )}
       </section>
       <EvidenceBalance
@@ -294,31 +305,33 @@ function InferenceDetails({
   return (
     <section className="selection-card">
       <div className="selection-card-heading">
-        <span className="eyebrow">Inference selection</span>
+        <span className="eyebrow">
+          {UI_TEXT.inspector.inferenceSelection}
+        </span>
         <GitMerge size={17} />
       </div>
       <div className="inference-detail-title">
-        <h3>Inference Step</h3>
+        <h3>{UI_TEXT.inspector.inferenceStep}</h3>
         <span className={`inference-integrity-badge inference-integrity-badge--${getIntegrityClassName(inferenceStep.inference_integrity)}`}>
           <Route size={11} />
           {getInferenceIntegrityLabel(inferenceStep.inference_integrity, true)}
         </span>
       </div>
-      <h4>Premise claims</h4>
+      <h4>{UI_TEXT.inspector.premiseClaims}</h4>
       <ClaimReferenceList
         claimIds={inferenceStep.premise_claim_ids}
         indexes={indexes}
         onSelect={onSelect}
       />
-      <h4>Conclusion claim</h4>
+      <h4>{UI_TEXT.inspector.conclusionClaim}</h4>
       <ClaimReferenceList
         claimIds={[inferenceStep.conclusion_claim_id]}
         indexes={indexes}
         onSelect={onSelect}
       />
-      <h4>Detected gaps</h4>
+      <h4>{UI_TEXT.inspector.detectedGaps}</h4>
       {inferenceStep.gaps.length === 0 ? (
-        <p className="reference-empty">No Scope or Causal Gap detected.</p>
+        <p className="reference-empty">{UI_TEXT.inspector.noGaps}</p>
       ) : (
         <div className="structured-gap-list">
           {inferenceStep.gaps.map((gap, gapIndex) => (
@@ -354,8 +367,8 @@ export function SelectionInspector({
       <div className="selection-hint">
         <MousePointer2 size={18} />
         <div>
-          <strong>Select an analysis element</strong>
-          <p>Choose highlighted statement text, a Claim, an Inference Step, a Gap, an Article, or Evidence.</p>
+          <strong>{UI_TEXT.inspector.emptyTitle}</strong>
+          <p>{UI_TEXT.inspector.emptyDescription}</p>
         </div>
       </div>
     )
@@ -402,7 +415,7 @@ export function SelectionInspector({
   return (
     <section className="selection-card selection-card--gap">
       <div className="selection-card-heading">
-        <span className="eyebrow">Gap selection</span>
+        <span className="eyebrow">{UI_TEXT.inspector.gapSelection}</span>
         <TriangleAlert size={17} />
       </div>
       <div className="inference-detail-title">
@@ -412,19 +425,19 @@ export function SelectionInspector({
           {getInferenceIntegrityLabel(inferenceStep.inference_integrity, true)}
         </span>
       </div>
-      <h4>Premise claims</h4>
+      <h4>{UI_TEXT.inspector.premiseClaims}</h4>
       <ClaimReferenceList
         claimIds={inferenceStep.premise_claim_ids}
         indexes={indexes}
         onSelect={onSelect}
       />
-      <h4>Conclusion claim</h4>
+      <h4>{UI_TEXT.inspector.conclusionClaim}</h4>
       <ClaimReferenceList
         claimIds={[inferenceStep.conclusion_claim_id]}
         indexes={indexes}
         onSelect={onSelect}
       />
-      <h4>Structured gap</h4>
+      <h4>{UI_TEXT.inspector.structuredGap}</h4>
       <StructuredGapCard gap={gap} />
       <ImpactDetails
         inferenceStep={inferenceStep}

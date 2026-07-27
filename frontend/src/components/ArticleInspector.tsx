@@ -13,6 +13,7 @@ import type {
   ArticleEvidenceSpanResponse,
 } from '../contracts'
 import { useArticleContextQuery } from '../hooks/useArticleContextQuery'
+import { UI_TEXT } from '../uiText'
 import { getApiErrorMessage } from '../utils/format'
 import {
   APPLICABILITY_DIMENSIONS,
@@ -35,7 +36,7 @@ interface ArticleInspectorProps {
 }
 
 function formatConfidence(confidence: number): string {
-  if (!Number.isFinite(confidence)) return '—'
+  if (!Number.isFinite(confidence)) return UI_TEXT.common.dash
   return new Intl.NumberFormat(undefined, {
     style: 'percent',
     maximumFractionDigits: 1,
@@ -54,7 +55,7 @@ function sectionName(
   return (
     evidence.section?.trim() ||
     contextSpan?.section?.trim() ||
-    'Section unavailable'
+    UI_TEXT.common.sectionUnavailable
   )
 }
 
@@ -66,20 +67,32 @@ function ArticleMetadata({
   return (
     <section className={`article-overview-card article-overview-card--${article.stance} is-selected`}>
       <div className="article-overview-heading">
-        <span>Rank {Number.isFinite(article.rank) ? article.rank : '—'}</span>
+        <span>
+          {UI_TEXT.articles.rank(
+            Number.isFinite(article.rank)
+              ? article.rank
+              : UI_TEXT.common.dash,
+          )}
+        </span>
         <span className={`article-stance article-stance--${article.stance}`}>
-          {article.stance}
+          {UI_TEXT.articles.groups[article.stance]}
         </span>
       </div>
-      <h3>{article.display_title || article.title || '—'}</h3>
+      <h3>
+        {article.display_title || article.title || UI_TEXT.common.dash}
+      </h3>
       <dl className="article-metadata-grid">
-        <div><dt>PMID</dt><dd>{article.pmid ?? '—'}</dd></div>
-        <div><dt>Stance confidence</dt><dd>{formatConfidence(article.confidence)}</dd></div>
-        <div><dt>Evidence sentences</dt><dd>{article.evidence_ids.length}</dd></div>
+        <div><dt>{UI_TEXT.articles.pmid}</dt><dd>{article.pmid ?? UI_TEXT.common.dash}</dd></div>
+        <div><dt>{UI_TEXT.articles.stanceConfidence}</dt><dd>{formatConfidence(article.confidence)}</dd></div>
+        <div><dt>{UI_TEXT.articles.evidenceSentences}</dt><dd>{article.evidence_ids.length}</dd></div>
       </dl>
       <div className="article-rationale">
-        <strong>Rationale</strong>
-        <p>{article.display_rationale || article.rationale || '—'}</p>
+        <strong>{UI_TEXT.articles.rationale}</strong>
+        <p>
+          {article.display_rationale ||
+            article.rationale ||
+            UI_TEXT.common.dash}
+        </p>
       </div>
     </section>
   )
@@ -96,16 +109,18 @@ function ArticleApplicabilitySection({
   return (
     <section className="article-applicability-section">
       <div className="inspector-section-heading">
-        <h3>Article Applicability</h3>
-        {applicability && <span>8 dimensions</span>}
+        <h3>{UI_TEXT.articles.applicability.title}</h3>
+        {applicability && (
+          <span>{UI_TEXT.articles.applicability.dimensions}</span>
+        )}
       </div>
       <p className="applicability-description">
-        How directly this article matches the exact claim.
+        {UI_TEXT.articles.applicability.description}
       </p>
 
       {!applicability ? (
         <p className="applicability-unavailable">
-          Article applicability unavailable for this Run.
+          {UI_TEXT.articles.applicability.unavailable}
         </p>
       ) : (
         <>
@@ -126,14 +141,14 @@ function ArticleApplicabilitySection({
           </dl>
 
           <section className="applicability-issues">
-            <h4>Applicability Issues</h4>
+            <h4>{UI_TEXT.articles.applicability.issuesTitle}</h4>
             {issues === undefined ? (
               <p className="applicability-issues-empty">
-                Applicability issues unavailable for this Run.
+                {UI_TEXT.articles.applicability.issuesUnavailable}
               </p>
             ) : issues.length === 0 ? (
               <p className="applicability-issues-empty">
-                No explicit applicability issues reported.
+                {UI_TEXT.articles.applicability.noIssues}
               </p>
             ) : (
               <div className="applicability-issue-list">
@@ -205,12 +220,15 @@ export function ArticleInspector({
 
   return (
     <section className="selection-card article-inspector">
-      <nav className="inspector-breadcrumb" aria-label="Inspector breadcrumb">
+      <nav
+        className="inspector-breadcrumb"
+        aria-label={UI_TEXT.articles.breadcrumbLabel}
+      >
         <button
           type="button"
           onClick={() => onSelect({ kind: 'claim', claimId: claim.claim_id })}
         >
-          Claim
+          {UI_TEXT.common.claim}
         </button>
         <span>›</span>
         {selection.kind === 'evidence' ? (
@@ -221,15 +239,15 @@ export function ArticleInspector({
               articleNodeId: article.article_node_id,
             })}
           >
-            Article
+            {UI_TEXT.common.article}
           </button>
         ) : (
-          <strong>Article</strong>
+          <strong>{UI_TEXT.common.article}</strong>
         )}
         {selection.kind === 'evidence' && (
           <>
             <span>›</span>
-            <strong>Evidence</strong>
+            <strong>{UI_TEXT.common.evidence}</strong>
           </>
         )}
       </nav>
@@ -245,22 +263,22 @@ export function ArticleInspector({
           rel="noreferrer noopener"
         >
           <ExternalLink size={13} />
-          Open in PubMed
+          {UI_TEXT.articles.openPubMed}
         </a>
       )}
 
       {selectedEvidence && (
         <section className="active-evidence-summary">
-          <span className="eyebrow">Evidence selection</span>
+          <span className="eyebrow">{UI_TEXT.articles.evidenceSelection}</span>
           <strong>{selectedEvidence.display_text || selectedEvidence.text}</strong>
           <dl>
-            <div><dt>Section</dt><dd>{sectionName(selectedEvidence, activeContextSpan)}</dd></div>
-            <div><dt>Sentence index</dt><dd>{selectedEvidence.sentence_index}</dd></div>
-            <div><dt>Evidence ID</dt><dd title={selectedEvidence.evidence_id}>{shortEvidenceId(selectedEvidence.evidence_id)}</dd></div>
+            <div><dt>{UI_TEXT.articles.section}</dt><dd>{sectionName(selectedEvidence, activeContextSpan)}</dd></div>
+            <div><dt>{UI_TEXT.articles.sentenceIndex}</dt><dd>{selectedEvidence.sentence_index}</dd></div>
+            <div><dt>{UI_TEXT.articles.evidenceId}</dt><dd title={selectedEvidence.evidence_id}>{shortEvidenceId(selectedEvidence.evidence_id)}</dd></div>
           </dl>
           {contextQuery.isSuccess && !activeContextSpan && (
             <p className="span-unavailable">
-              No canonical-text span is available for this evidence sentence.
+              {UI_TEXT.articles.noCanonicalSpan}
             </p>
           )}
         </section>
@@ -268,7 +286,7 @@ export function ArticleInspector({
 
       <section className="article-evidence-list-section">
         <div className="inspector-section-heading">
-          <h3>Evidence Sentences</h3>
+          <h3>{UI_TEXT.articles.evidenceSentences}</h3>
           <span>{evidenceItems.length}</span>
         </div>
         <div className="article-evidence-list">
@@ -290,27 +308,34 @@ export function ArticleInspector({
               >
                 <span className="evidence-item-heading">
                   <span><FileText size={11} /> {sectionName(evidence, contextSpan)}</span>
-                  <span>Sentence {evidence.sentence_index}</span>
+                  <span>{UI_TEXT.articles.sentence(evidence.sentence_index)}</span>
                 </span>
                 <strong>{evidence.display_text || evidence.text}</strong>
                 <small title={evidence.evidence_id}>
-                  {shortEvidenceId(evidence.evidence_id)}
-                  {isUnlocated ? ' · Span unavailable' : ''}
+                  {isUnlocated
+                    ? UI_TEXT.articles.unlocatedEvidence(
+                        shortEvidenceId(evidence.evidence_id),
+                      )
+                    : shortEvidenceId(evidence.evidence_id)}
                 </small>
               </button>
             )
           })}
           {evidenceItems.length === 0 && (
-            <p className="reference-empty">No evidence sentences were linked to this Article.</p>
+            <p className="reference-empty">{UI_TEXT.articles.noEvidence}</p>
           )}
         </div>
       </section>
 
       <section className="article-context-section">
         <div className="inspector-section-heading">
-          <h3>Canonical Article Text</h3>
+          <h3>{UI_TEXT.articles.canonicalText}</h3>
           {contextQuery.isSuccess && (
-            <span>{contextQuery.data.sections.length} sections</span>
+            <span>
+              {UI_TEXT.articles.sectionCount(
+                contextQuery.data.sections.length,
+              )}
+            </span>
           )}
         </div>
 
@@ -319,21 +344,21 @@ export function ArticleInspector({
             <span className="context-skeleton" />
             <span className="context-skeleton context-skeleton--short" />
             <span className="context-skeleton" />
-            <small>Loading Article Context…</small>
+            <small>{UI_TEXT.articles.loadingContext}</small>
           </div>
         )}
 
         {contextQuery.isError && (
           <div className="article-context-error" role="alert">
             <AlertTriangle size={17} />
-            <strong>Article Context could not be loaded</strong>
+            <strong>{UI_TEXT.articles.contextLoadFailed}</strong>
             <p>{getApiErrorMessage(contextQuery.error)}</p>
             <button
               className="secondary-button"
               type="button"
               onClick={() => void contextQuery.refetch()}
             >
-              <RefreshCw size={13} /> Retry
+              <RefreshCw size={13} /> {UI_TEXT.common.retry}
             </button>
           </div>
         )}
@@ -349,17 +374,17 @@ export function ArticleInspector({
               <div>
                 <strong>
                   {typeof contextQuery.data.fingerprint_verified !== 'boolean'
-                    ? 'Verification unavailable'
+                    ? UI_TEXT.articles.fingerprint.unavailable
                     : contextQuery.data.fingerprint_verified
-                    ? 'Fingerprint verified'
-                    : 'Fingerprint not verified'}
+                    ? UI_TEXT.articles.fingerprint.verified
+                    : UI_TEXT.articles.fingerprint.unverified}
                 </strong>
                 <p>
                   {typeof contextQuery.data.fingerprint_verified !== 'boolean'
-                    ? 'The backend did not provide fingerprint verification status.'
+                    ? UI_TEXT.articles.fingerprint.unavailableDescription
                     : contextQuery.data.fingerprint_verified
-                    ? 'The displayed canonical text matches the evidence artifact used by the analysis.'
-                    : 'Cross-version fingerprint verification was unavailable; this does not by itself mean the article text is incorrect.'}
+                    ? UI_TEXT.articles.fingerprint.verifiedDescription
+                    : UI_TEXT.articles.fingerprint.unverifiedDescription}
                 </p>
               </div>
             </div>
