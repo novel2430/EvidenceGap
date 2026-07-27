@@ -5,14 +5,16 @@ The input already contains:
 * independently extracted biomedical claims;
 * immutable claim-level evidence states;
 * the explicit premise-to-conclusion relationships asserted by the original statement;
-* supplied article rationales and evidence sentences.
+* supplied article rationales, applicability matrices, applicability issues, and evidence sentences.
 
 Your task is limited to deciding whether each supplied inference step contains:
 
 * a SCOPE_GAP;
 * a CAUSAL_GAP;
 * both gaps;
-* or neither gap.
+* or neither gap;
+
+and, for every detected gap, expressing the unsupported transition and the evidence needed to close it in the required structured fields.
 
 Do not reassess the truth of any claim.
 Do not change any claim evidence state.
@@ -91,6 +93,48 @@ Causal wording alone does not create a CAUSAL_GAP.
 
 Mark CAUSAL_GAP only when the premises and supplied evidence fail to establish the causal strength asserted by the conclusion.
 
+## Structured output vocabulary
+
+### Allowed SCOPE_GAP subtypes
+
+* POPULATION_EXTENSION
+* INTERVENTION_MISMATCH
+* COMPARATOR_MISMATCH
+* OUTCOME_EXPANSION
+* TIMEFRAME_EXTENSION
+* SETTING_TRANSFER
+* QUANTIFIER_EXTENSION
+* PREVENTION_TREATMENT_TRANSFER
+* OTHER_SCOPE
+
+### Allowed CAUSAL_GAP subtypes
+
+* ASSOCIATION_TO_CAUSATION
+* SURROGATE_TO_CLINICAL_OUTCOME
+* MECHANISM_TO_CLINICAL_EFFECT
+* TEMPORAL_TO_CAUSATION
+* SEPARATE_LINKS_TO_STRONGER_CAUSAL_CLAIM
+* OTHER_CAUSAL
+
+### Allowed affected_dimensions values
+
+* population_or_species
+* intervention_or_exposure
+* comparator
+* outcome
+* direction
+* dose
+* timeframe
+* geography_or_setting
+* quantifier
+* causal_strength
+* prevention_treatment_scope
+* mechanism
+* mediation
+* other
+
+Use only these exact enum values. Do not invent new subtype or affected-dimension labels.
+
 ## Required analysis procedure
 
 Analyze each supplied inference_step independently and follow these steps in order.
@@ -122,7 +166,9 @@ Do not add or analyze A → C unless that step is explicitly supplied.
 
 ### Step 2: determine what the premises establish
 
-Using only the supplied claim text, evidence states, article rationales, and evidence sentences, identify the strongest scope and causal strength actually established by the premises.
+Using only the supplied claim text, evidence states, article rationales, article applicability matrices, applicability issues, and evidence sentences, identify the strongest scope and causal strength actually established by the premises.
+
+Article applicability is supporting context. Do not automatically convert every article-level MISMATCH into an inference gap. Judge only the direct movement from the supplied premises to the supplied conclusion.
 
 If information is absent, treat it as unknown.
 
@@ -161,12 +207,16 @@ Do not mark SCOPE_GAP when:
 * the only issue is weak, conflicting, insufficient, or refuting evidence;
 * no concrete unsupported extension can be identified.
 
-When SCOPE_GAP is true, the reason must name:
+When SCOPE_GAP is true:
 
-* the scope supported by the premises; and
-* the unsupported scope introduced by the conclusion.
+* `subtype` must use one allowed SCOPE_GAP subtype;
+* `affected_dimensions` must identify only the dimensions directly crossed;
+* `supported_basis` must state the narrower or materially limited scope established by the premises or supplied evidence;
+* `unsupported_extension` must state the broader or different scope introduced by the conclusion;
+* `reason` must concisely explain why that direct extension is unsupported;
+* `closure_requirement` must state the missing bridge premise or direct evidence needed to justify the inference.
 
-If both cannot be named, return detected = false.
+If the supported basis and unsupported extension cannot both be named concretely, return detected = false.
 
 ### Step 4: test for CAUSAL_GAP
 
@@ -191,12 +241,16 @@ Do not mark CAUSAL_GAP merely because:
 * the conclusion summarizes a causal premise at the same causal strength;
 * the premises directly establish the same causal relationship asserted by the conclusion.
 
-When CAUSAL_GAP is true, the reason must identify:
+When CAUSAL_GAP is true:
 
-* what weaker or different relationship the premises establish; and
-* what stronger causal relationship the conclusion asserts.
+* `subtype` must use one allowed CAUSAL_GAP subtype;
+* `affected_dimensions` must identify only the dimensions directly involved;
+* `supported_basis` must state the strongest relationship actually established by the premises or supplied evidence;
+* `unsupported_extension` must state the stronger causal, mechanistic, mediational, preventive, therapeutic, or directional relationship asserted by the conclusion;
+* `reason` must concisely explain why that direct causal move is unsupported;
+* `closure_requirement` must state the missing bridge premise or direct evidence needed to justify the inference.
 
-If the causal jump cannot be named concretely, return detected = false.
+If the weaker established relationship and the stronger asserted relationship cannot both be named concretely, return detected = false.
 
 ### Step 5: treat the two gap types independently
 
@@ -339,44 +393,94 @@ Examples:
 * A SUPPORTED premise may still participate in a SCOPE_GAP if the conclusion improperly generalizes it.
 * A SUPPORTED association may still participate in a CAUSAL_GAP if the conclusion asserts causation.
 
-## Reason requirements
+## Structured gap field requirements
 
-When detected is true:
+Judge SCOPE_GAP and CAUSAL_GAP independently.
 
-* provide one concise English sentence;
-* identify the concrete unsupported transition;
-* refer specifically to the premise scope or causal strength and the conclusion scope or causal strength;
-* do not give general criticism;
-* do not assess overall truth;
-* do not recommend further research or action.
+For each gap object, return exactly these fields:
 
-When detected is false:
+* `detected`
+* `subtype`
+* `affected_dimensions`
+* `supported_basis`
+* `unsupported_extension`
+* `reason`
+* `closure_requirement`
 
-* reason must be null.
+### When detected is true
 
-Good SCOPE_GAP reason:
+All structured fields must be populated:
 
+* `subtype` must be one allowed subtype for that gap type;
+* `affected_dimensions` must be a non-empty array using only allowed values;
+* `supported_basis` must be one concise English sentence stating what the premises or supplied evidence actually establish;
+* `unsupported_extension` must be one concise English sentence stating what additional scope or causal strength the conclusion introduces;
+* `reason` must be one concise English sentence explaining the concrete unsupported transition;
+* `closure_requirement` must be one concise English sentence stating the missing bridge premise or direct evidence needed to justify this inference.
+
+The closure requirement:
+
+* must describe the specific evidentiary link that is missing;
+* must not give clinical advice;
+* must not recommend an action;
+* must not prescribe a particular study design;
+* must not use outside knowledge;
+* must not say only "more research is needed" or an equivalent generic phrase.
+
+### When detected is false
+
+Return exactly:
+
+* `subtype`: null
+* `affected_dimensions`: []
+* `supported_basis`: null
+* `unsupported_extension`: null
+* `reason`: null
+* `closure_requirement`: null
+
+Do not populate structured fields for a gap that is not detected.
+
+### Good structured SCOPE_GAP
+
+`subtype`:
+POPULATION_EXTENSION
+
+`supported_basis`:
+"The premises support benefit only in vitamin-D-deficient older adults."
+
+`unsupported_extension`:
+"The conclusion extends that benefit to the general adult population."
+
+`reason`:
 "The premises support benefit only in vitamin-D-deficient older adults, while the conclusion extends that benefit to the general adult population."
 
-Good CAUSAL_GAP reason:
+`closure_requirement`:
+"Direct evidence establishing the same benefit in the broader adult population is required."
 
+### Good structured CAUSAL_GAP
+
+`subtype`:
+ASSOCIATION_TO_CAUSATION
+
+`supported_basis`:
+"The premises establish an association between low vitamin D levels and infection risk."
+
+`unsupported_extension`:
+"The conclusion asserts that vitamin D supplementation prevents infection."
+
+`reason`:
 "The premises establish an association between low vitamin D levels and infection risk, while the conclusion asserts that supplementation prevents infection."
+
+`closure_requirement`:
+"Direct evidence linking vitamin D supplementation to reduced infection incidence is required."
 
 Bad reason:
 
 "The evidence is insufficient."
 
-Bad reason:
-
-"The conclusion may not be true."
-
-Bad reason:
+Bad closure requirement:
 
 "More research is needed."
-
-Bad reason:
-
-"The premise is refuted."
 
 ## Final self-check
 
@@ -393,28 +497,68 @@ Before returning the result for each inference step, verify:
 9. CAUSAL_GAP was marked only for a concrete increase in causal strength.
 10. Causal wording alone was not treated as a CAUSAL_GAP.
 11. The two gap types were judged independently.
-12. Every true reason names the specific unsupported transition.
-13. Every false reason is null.
-14. No outside medical knowledge was used.
-15. No claim, evidence state, or inference step was rewritten.
+12. Every true gap uses an allowed subtype.
+13. Every true gap has a non-empty affected_dimensions array using only allowed values.
+14. Every true supported_basis states only what the premises or supplied evidence establish.
+15. Every true unsupported_extension states the additional scope or causal strength introduced by the conclusion.
+16. Every true reason names the specific unsupported transition.
+17. Every true closure_requirement identifies the specific missing bridge premise or direct evidence.
+18. Every false gap has null structured text fields and an empty affected_dimensions array.
+19. No outside medical knowledge was used.
+20. No claim, evidence state, or inference step was rewritten.
 
 ## Output requirements
+
+The top-level JSON object must contain exactly one field named `analyses`.
+
+Do not use `inference_steps`, `results`, `items`, `summary`, `metadata`, or any other top-level field.
+
+Return exactly this structure:
+
+{
+  "analyses": [
+    {
+      "inference_step_id": "<exact supplied inference_step_id>",
+      "scope_gap": {
+        "detected": true,
+        "subtype": "<allowed SCOPE_GAP subtype or null>",
+        "affected_dimensions": ["<allowed dimension>"],
+        "supported_basis": "<concise English sentence or null>",
+        "unsupported_extension": "<concise English sentence or null>",
+        "reason": "<concise English sentence or null>",
+        "closure_requirement": "<concise English sentence or null>"
+      },
+      "causal_gap": {
+        "detected": false,
+        "subtype": null,
+        "affected_dimensions": [],
+        "supported_basis": null,
+        "unsupported_extension": null,
+        "reason": null,
+        "closure_requirement": null
+      }
+    }
+  ]
+}
+
+The example above demonstrates shape only. Determine the actual detected values independently for every supplied inference step.
+
+Additional requirements:
 
 * Analyze every supplied inference_step_id exactly once.
 * Return no result for standalone claims.
 * Preserve every inference_step_id exactly.
-* Return no extra items.
-* Keep results in the same order as the supplied inference steps.
-* Each step must contain one SCOPE_GAP decision and one CAUSAL_GAP decision.
+* Return no extra analysis items.
+* Keep analyses in the same order as the supplied inference steps.
+* Each analysis must contain exactly `inference_step_id`, `scope_gap`, and `causal_gap`.
+* Each gap object must contain exactly `detected`, `subtype`, `affected_dimensions`, `supported_basis`, `unsupported_extension`, `reason`, and `closure_requirement`.
 * `detected` must be a JSON boolean.
-* When `detected` is true, `reason` must be one concise English sentence.
-* When `detected` is false, `reason` must be null.
+* Do not reproduce premise_claim_ids, conclusion_claim_id, claims, evidence states, articles, or input inference-step objects in the output.
 * Do not return Markdown.
 * Do not return code fences.
 * Do not return commentary.
 * Do not return chain-of-thought or reasoning text.
-* Do not modify or reproduce claim evidence states as gap labels.
-* Do not include extra keys outside the required JSON structure.
+* Do not include extra keys anywhere in the JSON structure.
 
 Perform all analysis silently.
 

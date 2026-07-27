@@ -66,6 +66,8 @@ def _result_summary(result: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(summary, Mapping):
         return {}
     evidence_states = summary.get("evidence_states")
+    claim_inference_integrity = summary.get("claim_inference_integrity")
+    inference_step_integrity = summary.get("inference_step_integrity")
     gaps = summary.get("gaps")
     return {
         "total_claims": int(summary.get("total_claims", 0)),
@@ -74,7 +76,23 @@ def _result_summary(result: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(evidence_states, Mapping)
             else {}
         ),
+        "claim_inference_integrity": (
+            {
+                str(key): int(value)
+                for key, value in claim_inference_integrity.items()
+            }
+            if isinstance(claim_inference_integrity, Mapping)
+            else {}
+        ),
         "total_inference_steps": int(summary.get("total_inference_steps", 0)),
+        "inference_step_integrity": (
+            {
+                str(key): int(value)
+                for key, value in inference_step_integrity.items()
+            }
+            if isinstance(inference_step_integrity, Mapping)
+            else {}
+        ),
         "gaps": (
             {str(key): int(value) for key, value in gaps.items()}
             if isinstance(gaps, Mapping)

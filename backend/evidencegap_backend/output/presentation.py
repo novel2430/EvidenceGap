@@ -42,9 +42,9 @@ from evidencegap_backend.stance.llm_judge import (
     call_structured_llm,
 )
 
-PRESENTATION_BUNDLE_SCHEMA_VERSION = "1.1.0"
-PRESENTATION_BUNDLE_CONTRACT_ID = "phase077.presentation-bundle.v1"
-LOCALIZATION_PROMPT_VERSION = "phase077_output_localization_v3"
+PRESENTATION_BUNDLE_SCHEMA_VERSION = "1.4.0"
+PRESENTATION_BUNDLE_CONTRACT_ID = "phase09c.presentation-bundle.v3"
+LOCALIZATION_PROMPT_VERSION = "phase09b_output_localization_v1"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/output/presentation")
 
 _VERDICT_TO_EVIDENCE_STATE = {
@@ -56,6 +56,13 @@ _VERDICT_TO_EVIDENCE_STATE = {
 _EVIDENCE_STATES = (*_VERDICT_TO_EVIDENCE_STATE.values(), "ERROR")
 _ARGUMENT_ROLES = ("PREMISE", "INTERMEDIATE", "CONCLUSION", "STANDALONE")
 _GAP_TYPES = ("SCOPE_GAP", "CAUSAL_GAP")
+_CLAIM_INFERENCE_INTEGRITY_STATES = (
+    "INTACT",
+    "GAPPED",
+    "NOT_APPLICABLE",
+    "ERROR",
+)
+_STEP_INFERENCE_INTEGRITY_STATES = ("INTACT", "GAPPED")
 _ENGLISH_ALIASES = {"en", "en-us", "en-gb", "english", "english (us)", "english (uk)"}
 
 
@@ -144,6 +151,32 @@ def _claim_graph_metadata(
     return roles, premise_of, conclusion_of
 
 
+def _build_claim_audit(
+    *,
+    evidence_status: str,
+    incoming_step_ids: list[str],
+    step_integrity_by_id: Mapping[str, str],
+) -> dict[str, Any]:
+    if evidence_status == "ERROR":
+        inference_integrity = "ERROR"
+        affecting_step_ids: list[str] = []
+    elif not incoming_step_ids:
+        inference_integrity = "NOT_APPLICABLE"
+        affecting_step_ids = []
+    else:
+        affecting_step_ids = [
+            step_id
+            for step_id in incoming_step_ids
+            if step_integrity_by_id[step_id] == "GAPPED"
+        ]
+        inference_integrity = "GAPPED" if affecting_step_ids else "INTACT"
+    return {
+        "evidence_status": evidence_status,
+        "inference_integrity": inference_integrity,
+        "affecting_inference_step_ids": affecting_step_ids,
+    }
+
+
 def build_presentation_bundle(
     statement_bundle: Mapping[str, Any],
     gap_bundle: Mapping[str, Any],
@@ -184,14 +217,35 @@ def build_presentation_bundle(
         step["gaps"] = []
         for field, gap_type in (("scope_gap", "SCOPE_GAP"), ("causal_gap", "CAUSAL_GAP")):
             if analysis[field]["detected"]:
+                gap = analysis[field]
                 step["gaps"].append(
                     {
                         "gap_type": gap_type,
+                        "subtype": gap["subtype"],
+                        "affected_dimensions": list(gap["affected_dimensions"]),
+                        "supported_basis": gap["supported_basis"],
+                        "unsupported_extension": gap["unsupported_extension"],
                         "detection_method": "llm",
-                        "reason_en": analysis[field]["reason"],
-                        "display_reason": analysis[field]["reason"],
+                        "reason_en": gap["reason"],
+                        "closure_requirement_en": gap["closure_requirement"],
+                        "display_reason": gap["reason"],
+                        "display_closure_requirement": gap["closure_requirement"],
                     }
                 )
+        step["inference_integrity"] = (
+            "GAPPED" if step["gaps"] else "INTACT"
+        )
+
+    step_integrity_by_id = {
+        str(step["inference_step_id"]): str(step["inference_integrity"])
+        for step in steps
+    }
+    for claim in claims:
+        claim["audit"] = _build_claim_audit(
+            evidence_status=str(claim["evidence_state"]),
+            incoming_step_ids=list(claim["conclusion_inference_step_ids"]),
+            step_integrity_by_id=step_integrity_by_id,
+        )
 
     articles = copy.deepcopy(list(statement_bundle["articles"]))
     for article in articles:
@@ -235,7 +289,18 @@ def _summary(bundle: Mapping[str, Any]) -> dict[str, Any]:
             role: sum(claim["argument_role"] == role for claim in claims)
             for role in _ARGUMENT_ROLES
         },
+        "claim_inference_integrity": {
+            state: sum(
+                claim["audit"]["inference_integrity"] == state
+                for claim in claims
+            )
+            for state in _CLAIM_INFERENCE_INTEGRITY_STATES
+        },
         "total_inference_steps": len(steps),
+        "inference_step_integrity": {
+            state: sum(step["inference_integrity"] == state for step in steps)
+            for state in _STEP_INFERENCE_INTEGRITY_STATES
+        },
         "gaps": {
             gap_type: sum(
                 gap["gap_type"] == gap_type
@@ -246,6 +311,18 @@ def _summary(bundle: Mapping[str, Any]) -> dict[str, Any]:
         },
         "articles": len(bundle["articles"]),
         "evidence": len(bundle["evidence"]),
+        "terminal_conclusions": [
+            {
+                "claim_id": claim["claim_id"],
+                "evidence_status": claim["audit"]["evidence_status"],
+                "inference_integrity": claim["audit"]["inference_integrity"],
+                "affecting_inference_step_ids": list(
+                    claim["audit"]["affecting_inference_step_ids"]
+                ),
+            }
+            for claim in claims
+            if claim["argument_role"] == "CONCLUSION"
+        ],
     }
 
 
@@ -269,9 +346,11 @@ def _translation_units(bundle: Mapping[str, Any]) -> list[dict[str, str]]:
         add(f"evidence:{item['evidence_id']}", item["display_text"])
     for step in bundle["inference_steps"]:
         for gap in step["gaps"]:
+            prefix = f"inference:{step['inference_step_id']}:{gap['gap_type']}"
+            add(f"{prefix}:reason", gap["display_reason"])
             add(
-                f"inference:{step['inference_step_id']}:{gap['gap_type']}",
-                gap["display_reason"],
+                f"{prefix}:closure_requirement",
+                gap["display_closure_requirement"],
             )
     return units
 
@@ -395,8 +474,10 @@ def apply_localization(bundle: Mapping[str, Any], translations: Mapping[str, str
             item["display_text"] = translations[f"evidence:{item['evidence_id']}"]
     for step in localized["inference_steps"]:
         for gap in step["gaps"]:
-            gap["display_reason"] = translations[
-                f"inference:{step['inference_step_id']}:{gap['gap_type']}"
+            prefix = f"inference:{step['inference_step_id']}:{gap['gap_type']}"
+            gap["display_reason"] = translations[f"{prefix}:reason"]
+            gap["display_closure_requirement"] = translations[
+                f"{prefix}:closure_requirement"
             ]
     return localized
 
@@ -512,11 +593,26 @@ def validate_presentation_bundle(
     if not str(bundle["statement"].get("display_text") or "").strip():
         raise EvidenceGapError("Presentation statement display text is blank")
 
+    gap_source = {
+        str(row["inference_step_id"]): row
+        for row in gap_bundle["inference_gap_analyses"]
+    }
+    step_integrity_by_id = {
+        step_id: (
+            "GAPPED"
+            if analysis["scope_gap"]["detected"]
+            or analysis["causal_gap"]["detected"]
+            else "INTACT"
+        )
+        for step_id, analysis in gap_source.items()
+    }
+
     claim_added = (
         "evidence_state",
         "argument_role",
         "premise_inference_step_ids",
         "conclusion_inference_step_ids",
+        "audit",
         "display_text",
         "display_rationale",
     )
@@ -532,14 +628,20 @@ def validate_presentation_bundle(
         )
         if row.get("evidence_state") != expected_state or row.get("argument_role") not in _ARGUMENT_ROLES:
             raise EvidenceGapError("Invalid presentation Claim enrichment")
+        expected_audit = _build_claim_audit(
+            evidence_status=expected_state,
+            incoming_step_ids=list(row.get("conclusion_inference_step_ids") or []),
+            step_integrity_by_id=step_integrity_by_id,
+        )
+        if row.get("audit") != expected_audit:
+            raise EvidenceGapError("Invalid presentation Claim audit")
         if not str(row.get("display_text") or "").strip():
             raise EvidenceGapError("Presentation Claim display text is blank")
 
-    gap_source = {str(row["inference_step_id"]): row for row in gap_bundle["inference_gap_analyses"]}
     if len(bundle["inference_steps"]) != len(statement_bundle["inference_steps"]):
         raise EvidenceGapError("Presentation inference count mismatch")
     for row, source in zip(bundle["inference_steps"], statement_bundle["inference_steps"], strict=True):
-        if _without_added_fields(row, ("gaps",)) != source:
+        if _without_added_fields(row, ("gaps", "inference_integrity")) != source:
             raise EvidenceGapError("Presentation inference changed source data")
         expected = []
         analysis = gap_source[str(source["inference_step_id"])]
@@ -549,13 +651,38 @@ def validate_presentation_bundle(
             expected.append("CAUSAL_GAP")
         if [gap.get("gap_type") for gap in row["gaps"]] != expected:
             raise EvidenceGapError("Presentation Gap mismatch")
-        if any(
-            gap.get("detection_method") != "llm"
-            or not str(gap.get("reason_en") or "").strip()
-            or not str(gap.get("display_reason") or "").strip()
-            for gap in row["gaps"]
-        ):
-            raise EvidenceGapError("Invalid presentation Gap")
+        expected_integrity = "GAPPED" if expected else "INTACT"
+        if row.get("inference_integrity") != expected_integrity:
+            raise EvidenceGapError("Invalid presentation inference integrity")
+        source_by_type = {
+            "SCOPE_GAP": analysis["scope_gap"],
+            "CAUSAL_GAP": analysis["causal_gap"],
+        }
+        for gap in row["gaps"]:
+            source_gap = source_by_type[str(gap.get("gap_type"))]
+            if (
+                gap.get("detection_method") != "llm"
+                or gap.get("subtype") != source_gap["subtype"]
+                or gap.get("affected_dimensions")
+                != source_gap["affected_dimensions"]
+                or gap.get("supported_basis") != source_gap["supported_basis"]
+                or gap.get("unsupported_extension")
+                != source_gap["unsupported_extension"]
+                or gap.get("reason_en") != source_gap["reason"]
+                or gap.get("closure_requirement_en")
+                != source_gap["closure_requirement"]
+                or not str(gap.get("display_reason") or "").strip()
+                or not str(gap.get("display_closure_requirement") or "").strip()
+            ):
+                raise EvidenceGapError("Invalid presentation Gap")
+            if not bundle["localized"] and (
+                gap["display_reason"] != gap["reason_en"]
+                or gap["display_closure_requirement"]
+                != gap["closure_requirement_en"]
+            ):
+                raise EvidenceGapError(
+                    "Unlocalized presentation Gap display text changed source data"
+                )
 
     for name, added, display_field in (
         ("articles", ("display_title", "display_rationale"), "display_title"),

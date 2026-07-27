@@ -16,6 +16,7 @@ from evidencegap_backend.common import (
     find_workspace_root,
 )
 from evidencegap_backend.pipeline.article_evidence import (
+    validate_article_applicability,
     validate_article_evidence_artifact,
     validate_retrieval_trace,
 )
@@ -24,8 +25,8 @@ from evidencegap_backend.pipeline.claim_aggregation import (
     validate_claim_aggregation_artifact,
 )
 
-FINAL_GRAPH_SCHEMA_VERSION = "2.1.0"
-FINAL_GRAPH_CONTRACT_ID = "phase07.final-graph.v2"
+FINAL_GRAPH_SCHEMA_VERSION = "2.2.0"
+FINAL_GRAPH_CONTRACT_ID = "phase07.final-graph.v3"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/pipeline/final_graph")
 
 ARTICLE_RELATIONS = {
@@ -152,6 +153,10 @@ def build_final_graph_bundle(
         if not isinstance(retrieval_trace, Mapping):
             raise EvidenceGapError(f"Missing retrieval trace for {article_id}")
         validate_retrieval_trace(retrieval_trace)
+        applicability, applicability_issues = validate_article_applicability(
+            row.get("applicability"),
+            row.get("applicability_issues"),
+        )
         nodes.append(
             {
                 "node_id": article_node_id,
@@ -166,6 +171,8 @@ def build_final_graph_bundle(
                 "stance": stance,
                 "confidence": float(row.get("confidence") or 0.0),
                 "probabilities": dict(row.get("probabilities") or {}),
+                "applicability": applicability,
+                "applicability_issues": applicability_issues,
                 "selected_evidence_count": len(selected_evidence),
                 "provider": row.get("provider"),
                 "model": row.get("model"),

@@ -36,10 +36,55 @@ from evidencegap_backend.stance.llm_judge import (
     call_structured_llm,
 )
 
-INFERENCE_GAP_ANALYSIS_SCHEMA_VERSION = "1.0.0"
-INFERENCE_GAP_ANALYSIS_CONTRACT_ID = "phase077.inference-gap-analysis.v1"
-INFERENCE_GAP_ANALYSIS_PROMPT_VERSION = "phase077_inference_gap_analysis_v2"
+INFERENCE_GAP_ANALYSIS_SCHEMA_VERSION = "1.1.0"
+INFERENCE_GAP_ANALYSIS_CONTRACT_ID = "phase09b.inference-gap-analysis.v2"
+INFERENCE_GAP_ANALYSIS_PROMPT_VERSION = "phase09b_inference_gap_analysis_v1"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/output/inference_gap_analysis")
+
+SCOPE_GAP_SUBTYPES = (
+    "POPULATION_EXTENSION",
+    "INTERVENTION_MISMATCH",
+    "COMPARATOR_MISMATCH",
+    "OUTCOME_EXPANSION",
+    "TIMEFRAME_EXTENSION",
+    "SETTING_TRANSFER",
+    "QUANTIFIER_EXTENSION",
+    "PREVENTION_TREATMENT_TRANSFER",
+    "OTHER_SCOPE",
+)
+CAUSAL_GAP_SUBTYPES = (
+    "ASSOCIATION_TO_CAUSATION",
+    "SURROGATE_TO_CLINICAL_OUTCOME",
+    "MECHANISM_TO_CLINICAL_EFFECT",
+    "TEMPORAL_TO_CAUSATION",
+    "SEPARATE_LINKS_TO_STRONGER_CAUSAL_CLAIM",
+    "OTHER_CAUSAL",
+)
+GAP_AFFECTED_DIMENSIONS = (
+    "population_or_species",
+    "intervention_or_exposure",
+    "comparator",
+    "outcome",
+    "direction",
+    "dose",
+    "timeframe",
+    "geography_or_setting",
+    "quantifier",
+    "causal_strength",
+    "prevention_treatment_scope",
+    "mechanism",
+    "mediation",
+    "other",
+)
+_GAP_FIELDS = {
+    "detected",
+    "subtype",
+    "affected_dimensions",
+    "supported_basis",
+    "unsupported_extension",
+    "reason",
+    "closure_requirement",
+}
 
 _VERDICT_TO_EVIDENCE_STATE = {
     "supported": "SUPPORTED",
@@ -50,15 +95,26 @@ _VERDICT_TO_EVIDENCE_STATE = {
 
 
 def response_json_schema() -> dict[str, Any]:
-    gap_schema = {
-        "type": "object",
-        "properties": {
-            "detected": {"type": "boolean"},
-            "reason": {"type": ["string", "null"]},
-        },
-        "required": ["detected", "reason"],
-        "additionalProperties": False,
-    }
+    def gap_schema(subtypes: tuple[str, ...]) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "detected": {"type": "boolean"},
+                "subtype": {"type": ["string", "null"], "enum": [*subtypes, None]},
+                "affected_dimensions": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": list(GAP_AFFECTED_DIMENSIONS)},
+                    "uniqueItems": True,
+                },
+                "supported_basis": {"type": ["string", "null"]},
+                "unsupported_extension": {"type": ["string", "null"]},
+                "reason": {"type": ["string", "null"]},
+                "closure_requirement": {"type": ["string", "null"]},
+            },
+            "required": sorted(_GAP_FIELDS),
+            "additionalProperties": False,
+        }
+
     return {
         "type": "object",
         "properties": {
@@ -68,8 +124,8 @@ def response_json_schema() -> dict[str, Any]:
                     "type": "object",
                     "properties": {
                         "inference_step_id": {"type": "string"},
-                        "scope_gap": gap_schema,
-                        "causal_gap": gap_schema,
+                        "scope_gap": gap_schema(SCOPE_GAP_SUBTYPES),
+                        "causal_gap": gap_schema(CAUSAL_GAP_SUBTYPES),
                     },
                     "required": [
                         "inference_step_id",
@@ -151,6 +207,11 @@ def build_gap_analysis_input(statement_bundle: Mapping[str, Any]) -> dict[str, A
                 "stance": str(article.get("stance") or ""),
                 "confidence": float(article.get("confidence") or 0.0),
                 "rationale": str(article.get("rationale") or ""),
+                "applicability": dict(article.get("applicability") or {}),
+                "applicability_issues": [
+                    dict(value)
+                    for value in article.get("applicability_issues", [])
+                ],
                 "evidence": evidence_texts,
             }
         )
@@ -219,34 +280,147 @@ def build_user_prompt(
     return "\n\n".join(parts)
 
 
-def _validate_gap_result(value: Any, *, label: str) -> dict[str, Any]:
+def _normalized_optional_text(value: Any, *, label: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise _ProviderError(f"{label} must be string or null", retryable=True)
+    return value.strip() or None
+
+
+def _validate_gap_result(
+    value: Any,
+    *,
+    label: str,
+    allowed_subtypes: tuple[str, ...],
+) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise _ProviderError(f"{label} must be an object", retryable=True)
-    if set(value) != {"detected", "reason"}:
+    if set(value) != _GAP_FIELDS:
         raise _ProviderError(
-            f"{label} must contain exactly detected and reason", retryable=True
+            f"{label} must contain exactly {sorted(_GAP_FIELDS)}", retryable=True
         )
+
     detected = value.get("detected")
     if not isinstance(detected, bool):
         raise _ProviderError(f"{label}.detected must be boolean", retryable=True)
-    raw_reason = value.get("reason")
-    if raw_reason is None:
-        reason = None
-    elif isinstance(raw_reason, str):
-        reason = raw_reason.strip() or None
+
+    raw_subtype = value.get("subtype")
+    if raw_subtype is None:
+        subtype = None
+    elif isinstance(raw_subtype, str):
+        subtype = raw_subtype.strip().upper() or None
     else:
-        raise _ProviderError(f"{label}.reason must be string or null", retryable=True)
-    if detected and reason is None:
+        raise _ProviderError(f"{label}.subtype must be string or null", retryable=True)
+
+    raw_dimensions = value.get("affected_dimensions")
+    if not isinstance(raw_dimensions, list):
         raise _ProviderError(
-            f"{label}.reason must be non-empty when detected is true",
+            f"{label}.affected_dimensions must be an array", retryable=True
+        )
+    dimensions: list[str] = []
+    for raw_dimension in raw_dimensions:
+        if not isinstance(raw_dimension, str):
+            raise _ProviderError(
+                f"{label}.affected_dimensions must contain strings", retryable=True
+            )
+        dimension = raw_dimension.strip()
+        if dimension not in GAP_AFFECTED_DIMENSIONS:
+            raise _ProviderError(
+                f"{label}.affected_dimensions contains invalid value {dimension!r}",
+                retryable=True,
+            )
+        if dimension in dimensions:
+            raise _ProviderError(
+                f"{label}.affected_dimensions contains duplicate {dimension!r}",
+                retryable=True,
+            )
+        dimensions.append(dimension)
+
+    supported_basis = _normalized_optional_text(
+        value.get("supported_basis"), label=f"{label}.supported_basis"
+    )
+    unsupported_extension = _normalized_optional_text(
+        value.get("unsupported_extension"),
+        label=f"{label}.unsupported_extension",
+    )
+    reason = _normalized_optional_text(value.get("reason"), label=f"{label}.reason")
+    closure_requirement = _normalized_optional_text(
+        value.get("closure_requirement"),
+        label=f"{label}.closure_requirement",
+    )
+
+    if detected:
+        if subtype not in allowed_subtypes:
+            raise _ProviderError(
+                f"{label}.subtype must be one of {list(allowed_subtypes)} when detected is true",
+                retryable=True,
+            )
+        if not dimensions:
+            raise _ProviderError(
+                f"{label}.affected_dimensions cannot be empty when detected is true",
+                retryable=True,
+            )
+        missing = [
+            name
+            for name, item in (
+                ("supported_basis", supported_basis),
+                ("unsupported_extension", unsupported_extension),
+                ("reason", reason),
+                ("closure_requirement", closure_requirement),
+            )
+            if item is None
+        ]
+        if missing:
+            raise _ProviderError(
+                f"{label} requires non-empty fields when detected is true: {missing}",
+                retryable=True,
+            )
+    elif any(
+        item is not None
+        for item in (
+            subtype,
+            supported_basis,
+            unsupported_extension,
+            reason,
+            closure_requirement,
+        )
+    ) or dimensions:
+        raise _ProviderError(
+            f"{label} structured fields must be null or empty when detected is false",
             retryable=True,
         )
-    if not detected and reason is not None:
+
+    return {
+        "detected": detected,
+        "subtype": subtype,
+        "affected_dimensions": dimensions,
+        "supported_basis": supported_basis,
+        "unsupported_extension": unsupported_extension,
+        "reason": reason,
+        "closure_requirement": closure_requirement,
+    }
+
+
+def _normalize_provider_response_payload(
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Extract the contract payload from a provider JSON object.
+
+    DeepSeek's ``json_object`` mode guarantees valid JSON but does not enforce
+    ``additionalProperties: false`` from our response schema. Harmless top-level
+    fields such as ``summary`` must not invalidate an otherwise valid analyses
+    array. Artifact validation remains strict because this normalization is only
+    used at the provider boundary.
+    """
+    if "analyses" not in payload:
+        top_level_fields = sorted(str(key) for key in payload)
         raise _ProviderError(
-            f"{label}.reason must be null when detected is false",
+            "Response must contain the analyses field; received top-level "
+            f"fields: {top_level_fields}",
             retryable=True,
         )
-    return {"detected": detected, "reason": reason}
+    return {"analyses": payload["analyses"]}
 
 
 def validate_response_payload(
@@ -289,10 +463,14 @@ def validate_response_payload(
         analyses_by_id[inference_step_id] = {
             "inference_step_id": inference_step_id,
             "scope_gap": _validate_gap_result(
-                raw.get("scope_gap"), label="scope_gap"
+                raw.get("scope_gap"),
+                label="scope_gap",
+                allowed_subtypes=SCOPE_GAP_SUBTYPES,
             ),
             "causal_gap": _validate_gap_result(
-                raw.get("causal_gap"), label="causal_gap"
+                raw.get("causal_gap"),
+                label="causal_gap",
+                allowed_subtypes=CAUSAL_GAP_SUBTYPES,
             ),
         }
 
@@ -417,7 +595,8 @@ def _call_with_retries(
                 thinking=thinking,
             )
             analyses = validate_response_payload(
-                response.payload, statement_bundle=statement_bundle
+                _normalize_provider_response_payload(response.payload),
+                statement_bundle=statement_bundle,
             )
             return analyses, response, attempt
         except _ProviderError as exc:

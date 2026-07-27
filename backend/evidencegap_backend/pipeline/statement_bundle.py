@@ -16,7 +16,10 @@ from evidencegap_backend.common import (
     find_workspace_root,
 )
 from evidencegap_backend.config import validate_analysis_context
-from evidencegap_backend.pipeline.article_evidence import validate_retrieval_trace
+from evidencegap_backend.pipeline.article_evidence import (
+    validate_article_applicability,
+    validate_retrieval_trace,
+)
 from evidencegap_backend.pipeline.final_graph import (
     FINAL_GRAPH_CONTRACT_ID,
     FINAL_GRAPH_SCHEMA_VERSION,
@@ -31,8 +34,8 @@ from evidencegap_backend.pipeline.statement_decomposition import (
     validate_decomposition_bundle,
 )
 
-STATEMENT_BUNDLE_SCHEMA_VERSION = "1.2.0"
-STATEMENT_BUNDLE_CONTRACT_ID = "phase075.statement-bundle.v1"
+STATEMENT_BUNDLE_SCHEMA_VERSION = "1.3.0"
+STATEMENT_BUNDLE_CONTRACT_ID = "phase075.statement-bundle.v2"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/pipeline/statement_bundle")
 _VALID_VERDICTS = {"supported", "refuted", "mixed", "insufficient"}
 _VALID_STANCES = {"support", "refute", "insufficient"}
@@ -212,6 +215,10 @@ def _flatten_graph(
             "stance": str(node.get("stance") or ""),
             "confidence": float(node.get("confidence") or 0.0),
             "probabilities": dict(node.get("probabilities") or {}),
+            "applicability": dict(node.get("applicability") or {}),
+            "applicability_issues": [
+                dict(value) for value in node.get("applicability_issues") or []
+            ],
             "evidence_ids": evidence_ids_by_article[node_id],
             "provider": node.get("provider"),
             "model": node.get("model"),
@@ -493,6 +500,10 @@ def validate_statement_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         validate_retrieval_trace(trace)
         if int(trace["final_article_rank"]) != int(article.get("rank", -1)):
             raise EvidenceGapError("Article retrieval trace rank mismatch")
+        validate_article_applicability(
+            article.get("applicability"),
+            article.get("applicability_issues"),
+        )
         article_by_id[node_id] = article
 
     evidence_by_id: dict[str, Mapping[str, Any]] = {}

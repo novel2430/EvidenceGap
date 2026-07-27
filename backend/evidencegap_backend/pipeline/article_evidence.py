@@ -38,11 +38,42 @@ from evidencegap_backend.stance.llm_judge import (
     call_structured_llm,
 )
 
-ARTICLE_EVIDENCE_SCHEMA_VERSION = "1.1.0"
-ARTICLE_EVIDENCE_CONTRACT_ID = "phase07.article-evidence.v1"
-ARTICLE_EVIDENCE_PROMPT_VERSION = "phase07_article_evidence_v3"
+ARTICLE_EVIDENCE_SCHEMA_VERSION = "1.2.0"
+ARTICLE_EVIDENCE_CONTRACT_ID = "phase09a.article-evidence.v2"
+ARTICLE_EVIDENCE_PROMPT_VERSION = "phase09a_article_evidence_v1"
 DEFAULT_ARTIFACT_ROOT = Path("artifacts/v1/pipeline/article_evidence")
 DEFAULT_CACHE_ROOT = Path("artifacts/v1/stance_verification/article_evidence_cache")
+
+APPLICABILITY_DIMENSIONS = (
+    "population_or_species",
+    "intervention_or_exposure",
+    "comparator",
+    "outcome",
+    "direction",
+    "timeframe",
+    "causal_strength",
+    "prevention_treatment_scope",
+)
+APPLICABILITY_STATUSES = (
+    "MATCH",
+    "MISMATCH",
+    "NOT_REPORTED",
+    "NOT_APPLICABLE",
+)
+APPLICABILITY_ISSUE_CODES = (
+    "POPULATION_OR_SPECIES_MISMATCH",
+    "INTERVENTION_OR_EXPOSURE_MISMATCH",
+    "COMPARATOR_MISMATCH",
+    "OUTCOME_MISMATCH",
+    "SURROGATE_OUTCOME",
+    "DIRECTION_MISMATCH",
+    "TIMEFRAME_MISMATCH",
+    "CAUSAL_STRENGTH_MISMATCH",
+    "ASSOCIATION_DOES_NOT_ESTABLISH_CAUSATION",
+    "PREVENTION_TREATMENT_MISMATCH",
+    "PARTIAL_CLAIM_COVERAGE",
+    "OTHER_APPLICABILITY_MISMATCH",
+)
 
 
 def _optional_int(value: Any) -> int | None:
@@ -150,6 +181,80 @@ def validate_retrieval_trace(value: Mapping[str, Any]) -> dict[str, Any]:
 MAX_EVIDENCE_SENTENCES = 5
 
 
+def validate_article_applicability(
+    applicability: Any,
+    applicability_issues: Any,
+) -> tuple[dict[str, str], list[dict[str, str]]]:
+    if not isinstance(applicability, Mapping):
+        raise EvidenceGapError("applicability must be an object")
+    if set(applicability) != set(APPLICABILITY_DIMENSIONS):
+        raise EvidenceGapError(
+            "applicability must contain exactly the required dimensions"
+        )
+
+    normalized: dict[str, str] = {}
+    for dimension in APPLICABILITY_DIMENSIONS:
+        status = str(applicability.get(dimension) or "").strip().upper()
+        if status not in APPLICABILITY_STATUSES:
+            raise EvidenceGapError(
+                f"Invalid applicability status for {dimension}: {status!r}"
+            )
+        normalized[dimension] = status
+
+    if not isinstance(applicability_issues, list):
+        raise EvidenceGapError("applicability_issues must be an array")
+    issues: list[dict[str, str]] = []
+    seen_dimensions: set[str] = set()
+    for index, raw_issue in enumerate(applicability_issues):
+        if not isinstance(raw_issue, Mapping) or set(raw_issue) != {
+            "dimension",
+            "code",
+            "reason",
+        }:
+            raise EvidenceGapError(
+                f"applicability_issues[{index}] has invalid fields"
+            )
+        dimension = str(raw_issue.get("dimension") or "").strip()
+        code = str(raw_issue.get("code") or "").strip().upper()
+        reason = str(raw_issue.get("reason") or "").strip()
+        if dimension not in APPLICABILITY_DIMENSIONS:
+            raise EvidenceGapError(
+                f"applicability_issues[{index}].dimension is invalid"
+            )
+        if dimension in seen_dimensions:
+            raise EvidenceGapError(
+                f"Duplicate applicability issue for dimension {dimension}"
+            )
+        if code not in APPLICABILITY_ISSUE_CODES:
+            raise EvidenceGapError(
+                f"applicability_issues[{index}].code is invalid"
+            )
+        if not reason:
+            raise EvidenceGapError(
+                f"applicability_issues[{index}].reason cannot be blank"
+            )
+        seen_dimensions.add(dimension)
+        issues.append(
+            {
+                "dimension": dimension,
+                "code": code,
+                "reason": reason,
+            }
+        )
+
+    mismatch_dimensions = {
+        dimension
+        for dimension, status in normalized.items()
+        if status == "MISMATCH"
+    }
+    if seen_dimensions != mismatch_dimensions:
+        raise EvidenceGapError(
+            "applicability_issues must contain exactly one issue for every "
+            "MISMATCH dimension and no other dimensions"
+        )
+    return normalized, issues
+
+
 def response_json_schema() -> dict[str, Any]:
     return {
         "type": "object",
@@ -176,6 +281,37 @@ def response_json_schema() -> dict[str, Any]:
                             "items": {"type": "string"},
                         },
                         "rationale": {"type": "string"},
+                        "applicability": {
+                            "type": "object",
+                            "properties": {
+                                dimension: {
+                                    "type": "string",
+                                    "enum": list(APPLICABILITY_STATUSES),
+                                }
+                                for dimension in APPLICABILITY_DIMENSIONS
+                            },
+                            "required": list(APPLICABILITY_DIMENSIONS),
+                            "additionalProperties": False,
+                        },
+                        "applicability_issues": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "dimension": {
+                                        "type": "string",
+                                        "enum": list(APPLICABILITY_DIMENSIONS),
+                                    },
+                                    "code": {
+                                        "type": "string",
+                                        "enum": list(APPLICABILITY_ISSUE_CODES),
+                                    },
+                                    "reason": {"type": "string"},
+                                },
+                                "required": ["dimension", "code", "reason"],
+                                "additionalProperties": False,
+                            },
+                        },
                     },
                     "required": [
                         "article_id",
@@ -183,6 +319,8 @@ def response_json_schema() -> dict[str, Any]:
                         "probabilities",
                         "evidence_sentence_ids",
                         "rationale",
+                        "applicability",
+                        "applicability_issues",
                     ],
                     "additionalProperties": False,
                 },
@@ -343,6 +481,10 @@ def _required_output_template(items: Sequence[ArticlePromptInput]) -> dict[str, 
                 },
                 "evidence_sentence_ids": [],
                 "rationale": "One concise English sentence grounded in this article.",
+                "applicability": {
+                    dimension: "MATCH" for dimension in APPLICABILITY_DIMENSIONS
+                },
+                "applicability_issues": [],
             }
             for item in items
         ]
@@ -461,6 +603,13 @@ def validate_response_payload(
         rationale = str(raw.get("rationale") or "").strip()
         if not rationale:
             raise _ProviderError("Rationale cannot be blank", retryable=True)
+        try:
+            applicability, applicability_issues = validate_article_applicability(
+                raw.get("applicability"),
+                raw.get("applicability_issues"),
+            )
+        except EvidenceGapError as exc:
+            raise _ProviderError(str(exc), retryable=True) from exc
         validated.append(
             {
                 "article_id": article_id,
@@ -468,6 +617,8 @@ def validate_response_payload(
                 "probabilities": probabilities,
                 "aliases": aliases,
                 "rationale": rationale,
+                "applicability": applicability,
+                "applicability_issues": applicability_issues,
             }
         )
     return validated
@@ -561,6 +712,10 @@ def _write_cache(
                 "probabilities": dict(result["probabilities"]),
                 "evidence_sentence_ids": list(result["aliases"]),
                 "rationale": result["rationale"],
+                "applicability": dict(result["applicability"]),
+                "applicability_issues": [
+                    dict(value) for value in result["applicability_issues"]
+                ],
             }
             for result in results
         ]
@@ -748,6 +903,10 @@ def _output_row(
         "confidence": float(probabilities[label]),
         "probability_margin": ordered[0] - ordered[1],
         "rationale": str(result["rationale"]),
+        "applicability": dict(result["applicability"]),
+        "applicability_issues": [
+            dict(value) for value in result["applicability_issues"]
+        ],
         "selected_evidence": selected,
         "provider": provider,
         "model": model,
@@ -788,6 +947,10 @@ def validate_article_evidence_rows(
             raise EvidenceGapError(f"Label/probability mismatch for {article_id}")
         if abs(float(row.get("confidence")) - probabilities[label]) > 1e-5:
             raise EvidenceGapError(f"Confidence mismatch for {article_id}")
+        validate_article_applicability(
+            row.get("applicability"),
+            row.get("applicability_issues"),
+        )
         evidence = list(row.get("selected_evidence") or [])
         if label == "insufficient" and evidence:
             raise EvidenceGapError(f"Insufficient article selected evidence: {article_id}")

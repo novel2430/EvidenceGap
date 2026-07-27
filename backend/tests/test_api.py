@@ -48,7 +48,7 @@ class FakeEngine:
     @staticmethod
     def _bundle(statement: str, language: str) -> dict[str, Any]:
         return {
-            "schema_version": "1.1.0",
+            "schema_version": "1.2.0",
             "contract_id": "phase077.presentation-bundle.v1",
             "output_language": language,
             "localized": language != "English",
@@ -90,6 +90,17 @@ class FakeEngine:
                     "display_rationale": "The article reports a direct result.",
                     "stance": "support",
                     "confidence": 0.91,
+                    "applicability": {
+                        "population_or_species": "MATCH",
+                        "intervention_or_exposure": "MATCH",
+                        "comparator": "NOT_REPORTED",
+                        "outcome": "MATCH",
+                        "direction": "MATCH",
+                        "timeframe": "NOT_REPORTED",
+                        "causal_strength": "MATCH",
+                        "prevention_treatment_scope": "NOT_APPLICABLE",
+                    },
+                    "applicability_issues": [],
                 }
             ],
             "evidence": [

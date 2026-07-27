@@ -9,7 +9,14 @@ import pytest
 
 from evidencegap_backend.common import EvidenceGapError
 from evidencegap_backend.config import PipelineConfig
-from evidencegap_backend.output.presentation import build_presentation_bundle
+from evidencegap_backend.output.presentation import (
+    _build_claim_audit,
+    _translation_units,
+    apply_localization,
+    build_presentation_bundle,
+    validate_presentation_bundle,
+)
+from evidencegap_backend.output.report import render_markdown_report
 from evidencegap_backend.pipeline.article_evidence import build_retrieval_trace
 from evidencegap_backend.pipeline.claim_aggregation import aggregate_article_evidence_rows
 from evidencegap_backend.pipeline.final_graph import build_final_graph_bundle
@@ -93,6 +100,17 @@ def _article_row(
         "confidence": probabilities[label],
         "probability_margin": 0.85,
         "rationale": "Grounded article-level rationale.",
+        "applicability": {
+            "population_or_species": "MATCH",
+            "intervention_or_exposure": "MATCH",
+            "comparator": "NOT_REPORTED",
+            "outcome": "MATCH",
+            "direction": "MATCH",
+            "timeframe": "NOT_REPORTED",
+            "causal_strength": "MATCH",
+            "prevention_treatment_scope": "NOT_APPLICABLE",
+        },
+        "applicability_issues": [],
         "selected_evidence": evidence,
         "provider": "deepseek",
         "model": "test-model",
@@ -101,7 +119,9 @@ def _article_row(
     }
 
 
-def _phase81_bundles() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+def _phase81_bundles() -> tuple[
+    dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]
+]:
     statement = (
         "Vitamin D improves marker X. Vitamin D improves marker X. "
         "Therefore marker X reduces infections."
@@ -194,9 +214,22 @@ def _phase81_bundles() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
                 "inference_step_id": step_id,
                 "scope_gap": {
                     "detected": True,
-                    "reason": "The conclusion uses a broader outcome.",
+                    "subtype": "OUTCOME_EXPANSION",
+                    "affected_dimensions": ["outcome"],
+                    "supported_basis": "The premise supports improvement in marker X.",
+                    "unsupported_extension": "The conclusion extends marker X improvement to infection reduction.",
+                    "reason": "The conclusion uses a broader clinical outcome than the premise supports.",
+                    "closure_requirement": "Direct evidence linking marker X improvement to infection reduction is required.",
                 },
-                "causal_gap": {"detected": False, "reason": None},
+                "causal_gap": {
+                    "detected": False,
+                    "subtype": None,
+                    "affected_dimensions": [],
+                    "supported_basis": None,
+                    "unsupported_extension": None,
+                    "reason": None,
+                    "closure_requirement": None,
+                },
             }
         ],
         source_statement_bundle_sha256="a" * 64,
@@ -208,11 +241,11 @@ def _phase81_bundles() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         statement_bundle_sha256="a" * 64,
         gap_bundle_sha256="b" * 64,
     )
-    return decomposition, statement_bundle, presentation
+    return decomposition, statement_bundle, gap_bundle, presentation
 
 
 def test_phase81_contract_enrichments_propagate_to_presentation() -> None:
-    decomposition, statement_bundle, presentation = _phase81_bundles()
+    decomposition, statement_bundle, _, presentation = _phase81_bundles()
 
     first_claim = decomposition["claims"][0]
     assert first_claim["source_spans"] == exact_source_spans(
@@ -243,11 +276,139 @@ def test_phase81_contract_enrichments_propagate_to_presentation() -> None:
     assert presentation["articles"][0]["retrieval_trace"] == article[
         "retrieval_trace"
     ]
+    assert presentation["articles"][0]["applicability"] == article[
+        "applicability"
+    ]
+    assert presentation["articles"][0]["applicability_issues"] == []
     assert presentation["inference_steps"][0]["impact"] == impact
+    gap = presentation["inference_steps"][0]["gaps"][0]
+    step_id = presentation["inference_steps"][0]["inference_step_id"]
+    assert presentation["inference_steps"][0]["inference_integrity"] == "GAPPED"
+    assert gap["subtype"] == "OUTCOME_EXPANSION"
+    assert gap["affected_dimensions"] == ["outcome"]
+    assert gap["supported_basis"].startswith("The premise supports")
+    assert gap["closure_requirement_en"].startswith("Direct evidence")
+    assert gap["display_closure_requirement"] == gap["closure_requirement_en"]
+
+    first_audit = presentation["claims"][0]["audit"]
+    second_audit = presentation["claims"][1]["audit"]
+    assert first_audit == {
+        "evidence_status": "SUPPORTED",
+        "inference_integrity": "NOT_APPLICABLE",
+        "affecting_inference_step_ids": [],
+    }
+    assert second_audit == {
+        "evidence_status": "INSUFFICIENT",
+        "inference_integrity": "GAPPED",
+        "affecting_inference_step_ids": [step_id],
+    }
+    assert presentation["summary"]["claim_inference_integrity"] == {
+        "INTACT": 0,
+        "GAPPED": 1,
+        "NOT_APPLICABLE": 1,
+        "ERROR": 0,
+    }
+    assert presentation["summary"]["inference_step_integrity"] == {
+        "INTACT": 0,
+        "GAPPED": 1,
+    }
+    assert presentation["summary"]["terminal_conclusions"] == [
+        {
+            "claim_id": presentation["claims"][1]["claim_id"],
+            "evidence_status": "INSUFFICIENT",
+            "inference_integrity": "GAPPED",
+            "affecting_inference_step_ids": [step_id],
+        }
+    ]
+
+
+def test_phase9b_localizes_only_gap_reason_and_closure_display_fields() -> None:
+    _, _, _, presentation = _phase81_bundles()
+    units = _translation_units(presentation)
+    translations = {row["text_id"]: f"translated:{row['text_id']}" for row in units}
+
+    localized = apply_localization(presentation, translations)
+    source_gap = presentation["inference_steps"][0]["gaps"][0]
+    localized_gap = localized["inference_steps"][0]["gaps"][0]
+
+    assert localized_gap["subtype"] == source_gap["subtype"]
+    assert localized_gap["supported_basis"] == source_gap["supported_basis"]
+    assert localized_gap["unsupported_extension"] == source_gap["unsupported_extension"]
+    assert localized_gap["display_reason"].endswith(":reason")
+    assert localized_gap["display_closure_requirement"].endswith(
+        ":closure_requirement"
+    )
+
+
+def test_phase9b_report_includes_structured_gap_and_closure_requirement() -> None:
+    _, _, _, presentation = _phase81_bundles()
+
+    report = render_markdown_report(presentation)
+
+    assert "Subtype: `OUTCOME_EXPANSION`" in report
+    assert "Affected dimensions: outcome" in report
+    assert "Supported basis:" in report
+    assert "Unsupported extension:" in report
+    assert "Gap closure requirement:" in report
+    assert "Direct evidence linking marker X improvement" in report
+    assert "Claim inference integrity:" in report
+    assert "Inference integrity: **GAPPED**" in report
+
+
+def test_phase9c_intact_inference_is_derived_without_llm_output() -> None:
+    _, statement_bundle, _, _ = _phase81_bundles()
+    step_id = statement_bundle["inference_steps"][0]["inference_step_id"]
+    no_gap = {
+        "detected": False,
+        "subtype": None,
+        "affected_dimensions": [],
+        "supported_basis": None,
+        "unsupported_extension": None,
+        "reason": None,
+        "closure_requirement": None,
+    }
+    gap_bundle = build_inference_gap_analysis_bundle(
+        statement_bundle,
+        [
+            {
+                "inference_step_id": step_id,
+                "scope_gap": copy.deepcopy(no_gap),
+                "causal_gap": copy.deepcopy(no_gap),
+            }
+        ],
+        source_statement_bundle_sha256="a" * 64,
+    )
+
+    presentation = build_presentation_bundle(
+        statement_bundle,
+        gap_bundle,
+        output_language="English",
+        statement_bundle_sha256="a" * 64,
+        gap_bundle_sha256="b" * 64,
+    )
+
+    assert presentation["inference_steps"][0]["inference_integrity"] == "INTACT"
+    assert presentation["claims"][1]["audit"] == {
+        "evidence_status": "INSUFFICIENT",
+        "inference_integrity": "INTACT",
+        "affecting_inference_step_ids": [],
+    }
+
+
+def test_phase9c_error_claim_audit_is_deterministic() -> None:
+    assert _build_claim_audit(
+        evidence_status="ERROR",
+        incoming_step_ids=["step_1"],
+        step_integrity_by_id={"step_1": "GAPPED"},
+    ) == {
+        "evidence_status": "ERROR",
+        "inference_integrity": "ERROR",
+        "affecting_inference_step_ids": [],
+    }
 
 
 def test_phase81_validators_reject_tampered_enrichments() -> None:
-    decomposition, statement_bundle, _ = _phase81_bundles()
+    decomposition, statement_bundle, gap_bundle, presentation = _phase81_bundles()
 
     bad_decomposition = copy.deepcopy(decomposition)
     bad_decomposition["claims"][0]["source_spans"][0]["character_start"] += 1
@@ -259,12 +420,35 @@ def test_phase81_validators_reject_tampered_enrichments() -> None:
     with pytest.raises(EvidenceGapError, match="rank mismatch"):
         validate_statement_bundle(bad_trace)
 
+    bad_applicability = copy.deepcopy(statement_bundle)
+    bad_applicability["articles"][0]["applicability"]["outcome"] = "MISMATCH"
+    with pytest.raises(EvidenceGapError, match="exactly one issue"):
+        validate_statement_bundle(bad_applicability)
+
     bad_impact = copy.deepcopy(statement_bundle)
     bad_impact["inference_steps"][0]["impact"][
         "affects_terminal_conclusion"
     ] = False
     with pytest.raises(EvidenceGapError, match="impact mismatch"):
         validate_statement_bundle(bad_impact)
+
+    bad_audit = copy.deepcopy(presentation)
+    bad_audit["claims"][1]["audit"]["inference_integrity"] = "INTACT"
+    with pytest.raises(EvidenceGapError, match="Claim audit"):
+        validate_presentation_bundle(
+            bad_audit,
+            statement_bundle=statement_bundle,
+            gap_bundle=gap_bundle,
+        )
+
+    bad_integrity = copy.deepcopy(presentation)
+    bad_integrity["inference_steps"][0]["inference_integrity"] = "INTACT"
+    with pytest.raises(EvidenceGapError, match="inference integrity"):
+        validate_presentation_bundle(
+            bad_integrity,
+            statement_bundle=statement_bundle,
+            gap_bundle=gap_bundle,
+        )
 
 
 def test_inference_impact_cycle_is_finite_and_explicit() -> None:

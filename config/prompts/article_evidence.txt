@@ -165,6 +165,53 @@ If a material component is missing or incompatible, assign insufficient.
 
 Do not continue to support or refute merely because the article concerns the same broad topic.
 
+### Step 3A: record the applicability matrix
+
+For every article, return all eight applicability dimensions:
+
+* `population_or_species`;
+* `intervention_or_exposure`;
+* `comparator`;
+* `outcome`;
+* `direction`;
+* `timeframe`;
+* `causal_strength`;
+* `prevention_treatment_scope`.
+
+Applicability describes whether the article directly addresses the same claim component. It does not describe whether the reported result agrees with the claim. A directly contradictory or null result can still be `MATCH` on the relevant dimensions and receive a `refute` label.
+
+Use exactly one of these statuses for every dimension:
+
+* `MATCH`: the supplied text directly addresses the same component at the scope required by the claim;
+* `MISMATCH`: the supplied text addresses a materially different component or scope;
+* `NOT_REPORTED`: the dimension is relevant, but the supplied text does not report enough information to determine applicability;
+* `NOT_APPLICABLE`: the dimension genuinely does not apply to the claim.
+
+For every `MISMATCH` dimension, return exactly one `applicability_issues` item. Do not return issues for `MATCH`, `NOT_REPORTED`, or `NOT_APPLICABLE` dimensions.
+
+Each applicability issue must contain:
+
+* `dimension`: the mismatched applicability dimension, copied exactly from the eight allowed dimension names;
+* `code`: exactly one allowed issue code;
+* `reason`: one concise English sentence grounded only in the supplied article text.
+
+Allowed applicability issue codes:
+
+* `POPULATION_OR_SPECIES_MISMATCH`;
+* `INTERVENTION_OR_EXPOSURE_MISMATCH`;
+* `COMPARATOR_MISMATCH`;
+* `OUTCOME_MISMATCH`;
+* `SURROGATE_OUTCOME`;
+* `DIRECTION_MISMATCH`;
+* `TIMEFRAME_MISMATCH`;
+* `CAUSAL_STRENGTH_MISMATCH`;
+* `ASSOCIATION_DOES_NOT_ESTABLISH_CAUSATION`;
+* `PREVENTION_TREATMENT_MISMATCH`;
+* `PARTIAL_CLAIM_COVERAGE`;
+* `OTHER_APPLICABILITY_MISMATCH`.
+
+Keep the matrix compact. Do not write explanations for dimensions that are not `MISMATCH`.
+
 ### Step 4: determine the evidentiary direction
 
 Only after the applicability gate is satisfied:
@@ -525,6 +572,9 @@ Do not mention outside knowledge.
 * `evidence_sentence_ids` must be a JSON array.
 * Every evidence sentence ID must be copied exactly from the supplied article.
 * Do not return duplicate evidence sentence IDs.
+* `applicability` must be a JSON object containing exactly the eight required dimensions and exactly one allowed status for each dimension.
+* `applicability_issues` must be a JSON array containing exactly one issue for every `MISMATCH` dimension and no other issues.
+* Every applicability issue must contain exactly these keys: `dimension`, `code`, and `reason`.
 * Do not return Markdown.
 * Do not return code fences.
 * Do not return commentary.
@@ -551,7 +601,12 @@ Before returning each result, verify:
 14. Every selected sentence directly supports the assigned stance.
 15. Insufficient results contain no evidence sentence IDs.
 16. The rationale preserves the actual scope of the study.
-17. The output contains exactly the required JSON structure.
+17. All eight applicability dimensions are present and use only allowed statuses.
+18. Applicability records component compatibility rather than whether the result supports or contradicts the claim.
+19. Every `MISMATCH` dimension has exactly one grounded applicability issue.
+20. No applicability issue was returned for a non-`MISMATCH` dimension.
+21. Every applicability issue uses an allowed code and one concise English reason.
+22. The output contains exactly the required JSON structure.
 
 Perform all analysis silently.
 

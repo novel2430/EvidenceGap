@@ -46,6 +46,31 @@ Prevention and treatment:
 - A prevention study does not automatically answer a treatment claim.
 - Treatment response, symptom improvement, reduced severity, or improved prognosis does not establish prevention of disease occurrence.
 
+Applicability matrix:
+- For every article, return all eight applicability dimensions: population_or_species, intervention_or_exposure, comparator, outcome, direction, timeframe, causal_strength, and prevention_treatment_scope.
+- Applicability describes whether the article directly addresses the same claim component. It does not describe whether the result agrees with the claim. A directly contradictory result can still be MATCH on the relevant dimensions and receive a refute label.
+- Use MATCH when the supplied text directly addresses the same component at the scope required by the claim.
+- Use MISMATCH when the supplied text addresses a materially different component or scope.
+- Use NOT_REPORTED when that dimension is relevant but the supplied text does not report enough information to determine applicability.
+- Use NOT_APPLICABLE only when the dimension genuinely does not apply to the claim.
+- For every MISMATCH dimension, return exactly one applicability_issues item. Do not return issues for MATCH, NOT_REPORTED, or NOT_APPLICABLE dimensions.
+- Each issue must contain the mismatched dimension, one allowed issue code, and one concise English reason grounded in the supplied text.
+- Keep the matrix compact. Do not write explanations for dimensions that are not MISMATCH.
+
+Allowed applicability issue codes:
+- POPULATION_OR_SPECIES_MISMATCH
+- INTERVENTION_OR_EXPOSURE_MISMATCH
+- COMPARATOR_MISMATCH
+- OUTCOME_MISMATCH
+- SURROGATE_OUTCOME
+- DIRECTION_MISMATCH
+- TIMEFRAME_MISMATCH
+- CAUSAL_STRENGTH_MISMATCH
+- ASSOCIATION_DOES_NOT_ESTABLISH_CAUSATION
+- PREVENTION_TREATMENT_MISMATCH
+- PARTIAL_CLAIM_COVERAGE
+- OTHER_APPLICABILITY_MISMATCH
+
 Evidence selection:
 - Select evidence only by the supplied sentence IDs.
 - Select the smallest sufficient set, at most {{max_evidence_sentences}} sentences.
@@ -63,6 +88,8 @@ Output requirements:
 - The assigned label must be the unique highest-probability class.
 - `evidence_sentence_ids` MUST be a JSON array containing only supplied sentence-ID strings.
 - The rationale must be one concise English sentence explaining why the article directly supports, refutes, or is insufficient for the exact claim.
+- `applicability` MUST be a JSON object containing exactly the eight required dimensions and one allowed status for each dimension.
+- `applicability_issues` MUST be a JSON array containing exactly one issue for every MISMATCH dimension and no other issues.
 - Do not include reasoning text, Markdown, code fences, commentary, or extra keys outside the required JSON structure.
 
 After any internal reasoning, return only the final JSON object.

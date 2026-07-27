@@ -64,6 +64,8 @@ def render_markdown_report(
     )
     summary = presentation_bundle["summary"]
     states = summary.get("evidence_states", {})
+    claim_integrity = summary.get("claim_inference_integrity", {})
+    step_integrity = summary.get("inference_step_integrity", {})
     gaps = summary.get("gaps", {})
     lines.extend(
         [
@@ -72,7 +74,15 @@ def render_markdown_report(
             + ", ".join(
                 f"{key} {int(value)}" for key, value in states.items()
             ),
+            "- Claim inference integrity: "
+            + ", ".join(
+                f"{key} {int(value)}" for key, value in claim_integrity.items()
+            ),
             f"- Inference steps: {int(summary.get('total_inference_steps', 0))}",
+            "- Inference-step integrity: "
+            + ", ".join(
+                f"{key} {int(value)}" for key, value in step_integrity.items()
+            ),
             "- Gaps: "
             + ", ".join(f"{key} {int(value)}" for key, value in gaps.items()),
             f"- Retrieved articles evaluated: {int(summary.get('articles', 0))}",
@@ -98,16 +108,24 @@ def render_markdown_report(
         if not isinstance(claim, Mapping):
             continue
         claim_id = str(claim.get("claim_id") or "")
+        audit = claim.get("audit") if isinstance(claim.get("audit"), Mapping) else {}
         lines.extend(
             [
                 f"### {index}. {_text(claim.get('display_text') or claim.get('canonical_claim_en'))}",
                 "",
                 f"- Claim ID: `{claim_id}`",
                 f"- Evidence state: **{_text(claim.get('evidence_state'))}**",
+                f"- Inference integrity: **{_text(audit.get('inference_integrity'))}**",
                 f"- Argument role: {_text(claim.get('argument_role'))}",
                 f"- Analysis status: {_text(claim.get('analysis_status'))}",
             ]
         )
+        affecting_steps = audit.get("affecting_inference_step_ids")
+        if isinstance(affecting_steps, Sequence) and affecting_steps:
+            lines.append(
+                "- Affecting inference steps: "
+                + ", ".join(f"`{value}`" for value in affecting_steps)
+            )
         if claim.get("display_rationale"):
             lines.extend(["- Rationale:", *_quote_block(claim["display_rationale"])])
         claim_articles = articles_by_claim.get(claim_id, [])
@@ -157,13 +175,25 @@ def render_markdown_report(
                 [
                     f"### {_text(gap.get('gap_type'))}",
                     "",
+                    f"- Subtype: `{_text(gap.get('subtype'))}`",
+                    f"- Affected dimensions: {', '.join(str(value) for value in gap.get('affected_dimensions', []))}",
                     f"- Inference step: `{_text(step.get('inference_step_id'))}`",
+                    f"- Inference integrity: **{_text(step.get('inference_integrity'))}**",
                     f"- Premises: {', '.join(str(value) for value in step.get('premise_claim_ids', []))}",
                     f"- Conclusion: {_text(step.get('conclusion_claim_id'))}",
                     f"- Affects terminal conclusion: {bool(impact.get('affects_terminal_conclusion'))}",
                     f"- Downstream claims: {', '.join(str(value) for value in impact.get('downstream_claim_ids', [])) or 'None'}",
+                    "- Supported basis:",
+                    *_quote_block(gap.get("supported_basis")),
+                    "- Unsupported extension:",
+                    *_quote_block(gap.get("unsupported_extension")),
                     "- Reason:",
                     *_quote_block(gap.get("display_reason") or gap.get("reason_en")),
+                    "- Gap closure requirement:",
+                    *_quote_block(
+                        gap.get("display_closure_requirement")
+                        or gap.get("closure_requirement_en")
+                    ),
                     "",
                 ]
             )

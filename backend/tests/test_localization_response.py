@@ -23,7 +23,7 @@ ROWS = [
 def test_localization_prompt_shows_exact_output_shape() -> None:
     prompt = build_localization_prompt(UNITS, "繁體中文（台灣）")
 
-    assert LOCALIZATION_PROMPT_VERSION == "phase077_output_localization_v3"
+    assert LOCALIZATION_PROMPT_VERSION == "phase09b_output_localization_v1"
     assert '"translations"' in prompt
     assert '"translation_units"' in prompt
     assert "Do not return a top-level texts" in prompt
