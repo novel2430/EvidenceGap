@@ -1,8 +1,13 @@
 import type { KeyboardEvent, MouseEvent } from 'react'
 import type { NodeProps } from '@xyflow/react'
 import { Handle, Position } from '@xyflow/react'
-import { GitMerge, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { GitMerge, Route, TriangleAlert } from 'lucide-react'
 import type { InferenceGraphNode } from '../graph/types'
+import {
+  getGapTypeLabel,
+  getInferenceIntegrityLabel,
+  getIntegrityClassName,
+} from '../utils/presentationLabels'
 
 export function InferenceNode({ data }: NodeProps<InferenceGraphNode>) {
   const {
@@ -55,22 +60,24 @@ export function InferenceNode({ data }: NodeProps<InferenceGraphNode>) {
         <span><GitMerge size={13} /> Inference Step {stepNumber}</span>
       </div>
       <p>{inferenceStep.premise_claim_ids.length} premise{inferenceStep.premise_claim_ids.length === 1 ? '' : 's'} → 1 conclusion</p>
+      <div className="inference-integrity-row">
+        <span className={`inference-integrity-badge inference-integrity-badge--${getIntegrityClassName(inferenceStep.inference_integrity)}`}>
+          <Route size={11} />
+          {getInferenceIntegrityLabel(inferenceStep.inference_integrity, true)}
+        </span>
+      </div>
       <div className="gap-badges">
-        {inferenceStep.gaps.length === 0 ? (
-          <span className="gap-badge gap-badge--none"><ShieldCheck size={12} /> No detected gap</span>
-        ) : (
-          inferenceStep.gaps.map((gap, gapIndex) => (
-            <button
-              className={`nodrag nopan gap-badge gap-badge--${gap.gap_type.toLowerCase()}${selectedGapIndex === gapIndex ? ' is-selected' : ''}`}
-              type="button"
-              key={`${gap.gap_type}-${gapIndex}`}
-              onClick={(event) => selectGap(event, gapIndex)}
-            >
-              <TriangleAlert size={12} />
-              {gap.gap_type === 'SCOPE_GAP' ? 'Scope Gap' : 'Causal Gap'}
-            </button>
-          ))
-        )}
+        {inferenceStep.gaps.map((gap, gapIndex) => (
+          <button
+            className={`nodrag nopan gap-badge gap-badge--${gap.gap_type.toLowerCase()}${selectedGapIndex === gapIndex ? ' is-selected' : ''}`}
+            type="button"
+            key={`${gap.gap_type}-${gapIndex}`}
+            onClick={(event) => selectGap(event, gapIndex)}
+          >
+            <TriangleAlert size={11} />
+            {getGapTypeLabel(gap.gap_type)}
+          </button>
+        ))}
       </div>
       <Handle type="source" position={Position.Right} />
     </div>

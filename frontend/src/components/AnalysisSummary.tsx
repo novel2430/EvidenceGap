@@ -1,5 +1,10 @@
 import { Route, ShieldCheck } from 'lucide-react'
 import type { AnalysisContext, PresentationSummary } from '../contracts'
+import {
+  getEvidenceStatusLabel,
+  getInferenceIntegrityLabel,
+  getIntegrityClassName,
+} from '../utils/presentationLabels'
 
 interface AnalysisSummaryProps {
   summary: PresentationSummary | null
@@ -21,6 +26,9 @@ export function AnalysisSummary({ summary, analysisContext }: AnalysisSummaryPro
 
   const evidence = summary.evidence_states
   const gaps = summary.gaps
+  const claimIntegrity = summary.claim_inference_integrity
+  const stepIntegrity = summary.inference_step_integrity
+  const terminalConclusions = summary.terminal_conclusions
 
   return (
     <section className="analysis-summary panel">
@@ -34,14 +42,37 @@ export function AnalysisSummary({ summary, analysisContext }: AnalysisSummaryPro
           <div className="summary-card-icon"><ShieldCheck size={18} /></div>
           <div>
             <strong>Claim Evidence</strong>
-            <p>{evidence.SUPPORTED} Supported · {evidence.REFUTED} Refuted · {evidence.CONFLICTED} Conflicted · {evidence.INSUFFICIENT} Insufficient{evidence.ERROR ? ` · ${evidence.ERROR} Error` : ''}</p>
+            <p>{evidence.SUPPORTED ?? 0} Supported · {evidence.REFUTED ?? 0} Refuted · {evidence.CONFLICTED ?? 0} Conflicted · {evidence.INSUFFICIENT ?? 0} Insufficient{evidence.ERROR ? ` · ${evidence.ERROR} Error` : ''}</p>
           </div>
         </article>
         <article className="summary-card summary-card--integrity">
           <div className="summary-card-icon"><Route size={18} /></div>
-          <div>
-            <strong>Inference Integrity</strong>
-            <p>{gaps.SCOPE_GAP} Scope {gaps.SCOPE_GAP === 1 ? 'Gap' : 'Gaps'} · {gaps.CAUSAL_GAP} Causal {gaps.CAUSAL_GAP === 1 ? 'Gap' : 'Gaps'}</p>
+          <div className="summary-card-content">
+            <strong>Terminal Conclusions</strong>
+            {terminalConclusions === undefined ? (
+              <p>Two-axis terminal status unavailable for this Run.</p>
+            ) : terminalConclusions.length === 0 ? (
+              <p>No terminal conclusions.</p>
+            ) : (
+              <div className="terminal-conclusion-list">
+                {terminalConclusions.map((terminal) => (
+                  <div key={terminal.claim_id}>
+                    <span title={terminal.claim_id}>{terminal.claim_id}</span>
+                    <span className={`summary-axis-badge summary-axis-badge--evidence-${terminal.evidence_status.toLowerCase()}`}>
+                      {getEvidenceStatusLabel(terminal.evidence_status)}
+                    </span>
+                    <span className={`summary-axis-badge summary-axis-badge--integrity-${getIntegrityClassName(terminal.inference_integrity)}`}>
+                      {getInferenceIntegrityLabel(terminal.inference_integrity, true)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="summary-integrity-stats">
+              <span>Claims with intact inference: {claimIntegrity ? claimIntegrity.INTACT : 'Unavailable'} · gapped: {claimIntegrity ? claimIntegrity.GAPPED : 'Unavailable'}</span>
+              <span>Inference steps intact: {stepIntegrity ? stepIntegrity.INTACT : 'Unavailable'} · gapped: {stepIntegrity ? stepIntegrity.GAPPED : 'Unavailable'}</span>
+            </div>
+            <small>Detected gaps: {gaps.SCOPE_GAP ?? 0} scope · {gaps.CAUSAL_GAP ?? 0} causal</small>
           </div>
         </article>
         <article className="summary-card summary-card--boundary">

@@ -14,6 +14,13 @@ import type {
 } from '../contracts'
 import { useArticleContextQuery } from '../hooks/useArticleContextQuery'
 import { getApiErrorMessage } from '../utils/format'
+import {
+  APPLICABILITY_DIMENSIONS,
+  formatApplicabilityDimension,
+  formatEnumLabel,
+  getApplicabilityStatusClassName,
+  getApplicabilityStatusLabel,
+} from '../utils/presentationLabels'
 import type {
   GraphSelection,
   PresentationIndexes,
@@ -74,6 +81,81 @@ function ArticleMetadata({
         <strong>Rationale</strong>
         <p>{article.display_rationale || article.rationale || '—'}</p>
       </div>
+    </section>
+  )
+}
+
+function ArticleApplicabilitySection({
+  article,
+}: {
+  article: PresentationArticle
+}) {
+  const applicability = article.applicability
+  const issues = article.applicability_issues
+
+  return (
+    <section className="article-applicability-section">
+      <div className="inspector-section-heading">
+        <h3>Article Applicability</h3>
+        {applicability && <span>8 dimensions</span>}
+      </div>
+      <p className="applicability-description">
+        How directly this article matches the exact claim.
+      </p>
+
+      {!applicability ? (
+        <p className="applicability-unavailable">
+          Article applicability unavailable for this Run.
+        </p>
+      ) : (
+        <>
+          <dl className="applicability-matrix">
+            {APPLICABILITY_DIMENSIONS.map((dimension) => {
+              const status = applicability[dimension]
+              return (
+                <div key={dimension}>
+                  <dt>{formatApplicabilityDimension(dimension)}</dt>
+                  <dd>
+                    <span className={`applicability-status applicability-status--${getApplicabilityStatusClassName(status)}`}>
+                      {getApplicabilityStatusLabel(status)}
+                    </span>
+                  </dd>
+                </div>
+              )
+            })}
+          </dl>
+
+          <section className="applicability-issues">
+            <h4>Applicability Issues</h4>
+            {issues === undefined ? (
+              <p className="applicability-issues-empty">
+                Applicability issues unavailable for this Run.
+              </p>
+            ) : issues.length === 0 ? (
+              <p className="applicability-issues-empty">
+                No explicit applicability issues reported.
+              </p>
+            ) : (
+              <div className="applicability-issue-list">
+                {issues.map((issue, issueIndex) => (
+                  <article
+                    className="applicability-issue"
+                    key={`${issue.dimension}-${issue.code}-${issueIndex}`}
+                  >
+                    <div>
+                      <strong>
+                        {formatApplicabilityDimension(issue.dimension)}
+                      </strong>
+                      <span>{formatEnumLabel(issue.code).toUpperCase()}</span>
+                    </div>
+                    <p>{issue.reason}</p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </section>
   )
 }
@@ -153,6 +235,7 @@ export function ArticleInspector({
       </nav>
 
       <ArticleMetadata article={article} />
+      <ArticleApplicabilitySection article={article} />
 
       {pubmedId && (
         <a

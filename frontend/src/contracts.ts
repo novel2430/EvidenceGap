@@ -9,15 +9,47 @@ export type RunStage =
 
 export type ClaimAnalysisStatus = 'completed' | 'failed'
 export type ClaimVerdict = 'supported' | 'refuted' | 'mixed' | 'insufficient'
-export type EvidenceState =
+export type EvidenceStatus =
   | 'SUPPORTED'
   | 'REFUTED'
   | 'CONFLICTED'
   | 'INSUFFICIENT'
   | 'ERROR'
+export type EvidenceState = EvidenceStatus
+export type InferenceIntegrity =
+  | 'INTACT'
+  | 'GAPPED'
+  | 'NOT_APPLICABLE'
+  | 'ERROR'
+export type InferenceStepIntegrity = Extract<
+  InferenceIntegrity,
+  'INTACT' | 'GAPPED'
+>
 export type ArgumentRole = 'PREMISE' | 'INTERMEDIATE' | 'CONCLUSION' | 'STANDALONE'
 export type GapType = 'SCOPE_GAP' | 'CAUSAL_GAP'
 export type ArticleStance = 'support' | 'refute' | 'insufficient'
+export type ApplicabilityStatus =
+  | 'MATCH'
+  | 'MISMATCH'
+  | 'NOT_REPORTED'
+  | 'NOT_APPLICABLE'
+
+export interface ArticleApplicability {
+  population_or_species: ApplicabilityStatus
+  intervention_or_exposure: ApplicabilityStatus
+  comparator: ApplicabilityStatus
+  outcome: ApplicabilityStatus
+  direction: ApplicabilityStatus
+  timeframe: ApplicabilityStatus
+  causal_strength: ApplicabilityStatus
+  prevention_treatment_scope: ApplicabilityStatus
+}
+
+export interface ApplicabilityIssue {
+  dimension: keyof ArticleApplicability
+  code: string
+  reason: string
+}
 
 export interface RunCreateRequest {
   statement: string
@@ -108,6 +140,12 @@ export interface SourceSpan {
   character_end: number
 }
 
+export interface ClaimAudit {
+  evidence_status: EvidenceStatus
+  inference_integrity: InferenceIntegrity
+  affecting_inference_step_ids: string[]
+}
+
 export interface PresentationClaim {
   claim_id: string
   source_text: string
@@ -127,6 +165,7 @@ export interface PresentationClaim {
   conclusion_inference_step_ids: string[]
   display_text: string
   display_rationale: string | null
+  audit?: ClaimAudit
 }
 
 export interface InferenceImpact {
@@ -140,9 +179,15 @@ export interface InferenceImpact {
 
 export interface PresentationGap {
   gap_type: GapType
+  subtype?: string | null
+  affected_dimensions?: string[]
+  supported_basis?: string | null
+  unsupported_extension?: string | null
   detection_method: 'llm'
   reason_en: string
-  display_reason: string
+  closure_requirement_en?: string | null
+  display_reason?: string | null
+  display_closure_requirement?: string | null
 }
 
 export interface PresentationInferenceStep {
@@ -151,6 +196,7 @@ export interface PresentationInferenceStep {
   conclusion_claim_id: string
   impact: InferenceImpact
   gaps: PresentationGap[]
+  inference_integrity?: InferenceStepIntegrity
 }
 
 export interface RetrievalRankScore {
@@ -191,6 +237,8 @@ export interface PresentationArticle {
   prompt_version: string | null
   display_title: string
   display_rationale: string
+  applicability?: ArticleApplicability
+  applicability_issues?: ApplicabilityIssue[]
 }
 
 export interface PresentationEvidence {
@@ -219,15 +267,25 @@ export interface PresentationSummary {
   total_claims: number
   evidence_states: Record<EvidenceState, number>
   argument_roles: Record<ArgumentRole, number>
+  claim_inference_integrity?: Record<InferenceIntegrity, number>
   total_inference_steps: number
+  inference_step_integrity?: Record<InferenceStepIntegrity, number>
   gaps: Record<GapType, number>
   articles: number
   evidence: number
+  terminal_conclusions?: TerminalConclusionSummary[]
+}
+
+export interface TerminalConclusionSummary {
+  claim_id: string
+  evidence_status: EvidenceStatus
+  inference_integrity: InferenceIntegrity
+  affecting_inference_step_ids: string[]
 }
 
 export interface PresentationBundle {
-  schema_version: '1.1.0'
-  contract_id: 'phase077.presentation-bundle.v1'
+  schema_version: string
+  contract_id: string
   output_language: string
   localized: boolean
   source_statement_bundle_sha256: string

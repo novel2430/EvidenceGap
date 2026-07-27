@@ -4,6 +4,7 @@ import { Handle, Position } from '@xyflow/react'
 import {
   CheckCircle2,
   CircleHelp,
+  Route,
   Scale,
   TriangleAlert,
   XCircle,
@@ -11,6 +12,10 @@ import {
 } from 'lucide-react'
 import type { EvidenceState } from '../contracts'
 import type { ClaimGraphNode } from '../graph/types'
+import {
+  getInferenceIntegrityLabel,
+  getIntegrityClassName,
+} from '../utils/presentationLabels'
 
 const EVIDENCE_ICONS: Record<EvidenceState, LucideIcon> = {
   SUPPORTED: CheckCircle2,
@@ -22,7 +27,9 @@ const EVIDENCE_ICONS: Record<EvidenceState, LucideIcon> = {
 
 export function ClaimNode({ data }: NodeProps<ClaimGraphNode>) {
   const { claim, claimNumber, articleCounts, visual, onSelect } = data
-  const EvidenceIcon = EVIDENCE_ICONS[claim.evidence_state]
+  const evidenceStatus = claim.audit?.evidence_status ?? claim.evidence_state
+  const inferenceIntegrity = claim.audit?.inference_integrity
+  const EvidenceIcon = EVIDENCE_ICONS[evidenceStatus]
 
   function selectClaim() {
     onSelect?.({ kind: 'claim', claimId: claim.claim_id })
@@ -58,10 +65,16 @@ export function ClaimNode({ data }: NodeProps<ClaimGraphNode>) {
       </div>
       <p>{claim.display_text}</p>
       <div className="claim-node-footer">
-        <span className="evidence-state-badge">
-          <EvidenceIcon size={13} />
-          {claim.evidence_state}
-        </span>
+        <div className="claim-axis-badges">
+          <span className={`evidence-state-badge evidence-state-badge--${evidenceStatus.toLowerCase()}`}>
+            <EvidenceIcon size={12} />
+            {evidenceStatus}
+          </span>
+          <span className={`inference-integrity-badge inference-integrity-badge--${getIntegrityClassName(inferenceIntegrity)}`}>
+            <Route size={11} />
+            {getInferenceIntegrityLabel(inferenceIntegrity, true)}
+          </span>
+        </div>
         <span className="article-counts" title="Retrieved Top Articles">
           S {articleCounts.support} · R {articleCounts.refute} · I {articleCounts.insufficient}
         </span>

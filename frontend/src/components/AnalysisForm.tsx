@@ -20,8 +20,8 @@ export function AnalysisForm() {
   const queryClient = useQueryClient()
 
   const createRun = useMutation({
-    mutationFn: (trimmedStatement: string) =>
-      evidenceGapApi.createRun({ statement: trimmedStatement, language }),
+    mutationFn: (normalizedStatement: string) =>
+      evidenceGapApi.createRun({ statement: normalizedStatement, language }),
     onSuccess: async (createdRun) => {
       await queryClient.invalidateQueries({ queryKey: ['runs'] })
       navigate(`/runs/${encodeURIComponent(createdRun.run_id)}`)
@@ -30,14 +30,16 @@ export function AnalysisForm() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const trimmedStatement = statement.trim()
-    if (!trimmedStatement) {
+    const normalizedStatement = statement
+      .trim()
+      .replace(/\s+/g, ' ')
+    if (!normalizedStatement) {
       setValidationError('Enter a biomedical statement to analyze.')
       return
     }
 
     setValidationError(null)
-    createRun.mutate(trimmedStatement)
+    createRun.mutate(normalizedStatement)
   }
 
   const errorMessage = createRun.isError
