@@ -361,6 +361,7 @@ export function ClaimGraph({
           nodeTypes={nodeTypes}
           onInit={setFlowInstance}
           onPaneClick={() => onSelectionChange(null)}
+          onNodeClick={(event) => event.stopPropagation()}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}

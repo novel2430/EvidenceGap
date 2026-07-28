@@ -47,6 +47,8 @@ export function ClaimNode({ data }: NodeProps<ClaimGraphNode>) {
     <div
       className={[
         'claim-node',
+        'nodrag',
+        'nopan',
         `claim-node--${claim.evidence_state.toLowerCase()}`,
         visual.selected ? 'is-selected' : '',
         visual.spotlight ? 'is-spotlight' : '',

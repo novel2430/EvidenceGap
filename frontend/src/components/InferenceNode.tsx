@@ -46,6 +46,8 @@ export function InferenceNode({ data }: NodeProps<InferenceGraphNode>) {
     <div
       className={[
         'inference-node',
+        'nodrag',
+        'nopan',
         visual.selected ? 'is-selected' : '',
         visual.spotlight ? 'is-spotlight' : '',
         visual.dimmed ? 'is-dimmed' : '',
