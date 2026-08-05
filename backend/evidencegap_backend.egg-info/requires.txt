@@ -9,6 +9,13 @@ safetensors>=0.4
 stanza==1.14.0
 fastapi<1,>=0.115
 uvicorn<1,>=0.30
+pydantic<3,>=2.10
+langgraph<2,>=1.2
+langchain-core<2,>=1.5
+langgraph-checkpoint-sqlite<4,>=3.1
+
+[agent-dev]
+langgraph-cli[inmem]<0.5,>=0.4
 
 [test]
 httpx<1,>=0.27

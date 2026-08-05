@@ -4,6 +4,7 @@ evidencegap_backend/__init__.py
 evidencegap_backend/common.py
 evidencegap_backend/config.py
 evidencegap_backend/engine.py
+evidencegap_backend/prompting.py
 evidencegap_backend/resources.py
 evidencegap_backend.egg-info/PKG-INFO
 evidencegap_backend.egg-info/SOURCES.txt
@@ -21,6 +22,7 @@ evidencegap_backend/dense/encoders.py
 evidencegap_backend/dense/faiss_backend.py
 evidencegap_backend/output/__init__.py
 evidencegap_backend/output/presentation.py
+evidencegap_backend/output/report.py
 evidencegap_backend/pipeline/__init__.py
 evidencegap_backend/pipeline/analysis.py
 evidencegap_backend/pipeline/article_evidence.py
@@ -34,6 +36,11 @@ evidencegap_backend/pipeline/statement_analysis.py
 evidencegap_backend/pipeline/statement_bundle.py
 evidencegap_backend/pipeline/statement_decomposition.py
 evidencegap_backend/pipeline/statement_run.py
+evidencegap_backend/prompts/__init__.py
+evidencegap_backend/prompts/article_evidence.txt
+evidencegap_backend/prompts/inference_gap.txt
+evidencegap_backend/prompts/localization.txt
+evidencegap_backend/prompts/statement_decomposition.txt
 evidencegap_backend/reranking/__init__.py
 evidencegap_backend/reranking/cross_encoder.py
 evidencegap_backend/retrieval/__init__.py
@@ -44,4 +51,10 @@ evidencegap_backend/stance/__init__.py
 evidencegap_backend/stance/contracts.py
 evidencegap_backend/stance/llm_judge.py
 tests/test_api.py
+tests/test_config.py
 tests/test_engine.py
+tests/test_localization_response.py
+tests/test_phase81_contract.py
+tests/test_phase82_article_context.py
+tests/test_phase9a_article_applicability.py
+tests/test_phase9b_structured_gaps.py

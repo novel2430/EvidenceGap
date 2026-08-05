@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: evidencegap-backend
-Version: 0.3.0
+Version: 0.5.0
 Summary: Independent EvidenceGap 07.7 analysis runtime
 Requires-Python: >=3.11
 Requires-Dist: numpy<3,>=1.26
@@ -14,6 +14,12 @@ Requires-Dist: safetensors>=0.4
 Requires-Dist: stanza==1.14.0
 Requires-Dist: fastapi<1,>=0.115
 Requires-Dist: uvicorn<1,>=0.30
+Requires-Dist: pydantic<3,>=2.10
+Requires-Dist: langgraph<2,>=1.2
+Requires-Dist: langchain-core<2,>=1.5
+Requires-Dist: langgraph-checkpoint-sqlite<4,>=3.1
 Provides-Extra: test
 Requires-Dist: httpx<1,>=0.27; extra == "test"
 Requires-Dist: pytest<10,>=8; extra == "test"
+Provides-Extra: agent-dev
+Requires-Dist: langgraph-cli[inmem]<0.5,>=0.4; extra == "agent-dev"
