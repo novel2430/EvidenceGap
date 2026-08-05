@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -25,6 +26,7 @@ from evidencegap_backend.pipeline.statement_run import (
     validate_statement_pipeline_artifact,
 )
 from evidencegap_backend.resources import RuntimeResources
+from evidencegap_backend.agent.runner import run_agent_statement_analysis
 
 
 @dataclass(frozen=True)
@@ -94,7 +96,19 @@ class EvidenceGapEngine:
                 raise EvidenceGapError("EvidenceGapEngine.load() must be called first")
             cfg = self.config
             with workspace_root_context(cfg.workspace_root):
-                run = run_statement_pipeline(
+                pipeline_runner = run_statement_pipeline
+                agent_kwargs = (
+                    {
+                        "statement_analysis_runner": partial(
+                            run_agent_statement_analysis,
+                            agent_config=cfg.agent,
+                            controller_config=cfg.agent_controller_llm,
+                        )
+                    }
+                    if cfg.agent.enabled
+                    else {}
+                )
+                run = pipeline_runner(
                     cfg.workspace_root,
                     statement=statement,
                     run_name=run_name,
@@ -123,9 +137,7 @@ class EvidenceGapEngine:
                     gap_max_tokens=cfg.gap_max_tokens,
                     language=language or cfg.default_language,
                     translation_max_tokens=cfg.translation_max_tokens,
-                    translation_request_batch_size=(
-                        cfg.translation_request_batch_size
-                    ),
+                    translation_request_batch_size=(cfg.translation_request_batch_size),
                     timeout_seconds=cfg.timeout_seconds,
                     max_retries=cfg.max_retries,
                     decomposition_thinking=cfg.decomposition_thinking,
@@ -138,6 +150,7 @@ class EvidenceGapEngine:
                     resolved_config_snapshot=cfg.safe_dict(),
                     progress_callback=progress_callback,
                     force=force,
+                    **agent_kwargs,
                 )
                 artifact_value = Path(str(run["artifact_dir"]))
                 artifact_dir = (
@@ -313,9 +326,7 @@ class EvidenceGapEngine:
                         )
                     value = Path(str(meta.get("artifact_dir") or ""))
                     return (
-                        value
-                        if value.is_absolute()
-                        else cfg.workspace_root / value
+                        value if value.is_absolute() else cfg.workspace_root / value
                     ).resolve()
 
                 localization_stage = cfg.llm_stages["localization"]
@@ -330,9 +341,7 @@ class EvidenceGapEngine:
                     api_key_env=localization_stage.api_key_env,
                     base_url=localization_stage.base_url,
                     max_tokens=localization_stage.max_tokens,
-                    request_batch_size=(
-                        localization_stage.request_batch_size or 32
-                    ),
+                    request_batch_size=(localization_stage.request_batch_size or 32),
                     timeout_seconds=localization_stage.timeout_seconds,
                     max_retries=localization_stage.max_retries,
                     prompt_override=localization_stage.prompt,

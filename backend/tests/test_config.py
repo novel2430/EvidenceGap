@@ -94,9 +94,29 @@ def test_safe_snapshot_never_contains_api_key_value(tmp_path: Path) -> None:
     assert "secret-value-must-not-be-recorded" not in rendered
 
 
-def test_prompt_override_is_used_and_recorded(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_agent_config_and_controller_stage_environment(tmp_path: Path) -> None:
+    config = backend_config_from_env(
+        {
+            "EVIDENCEGAP_WORKSPACE_ROOT": str(tmp_path),
+            "EVIDENCEGAP_AGENT_ENABLED": "false",
+            "EVIDENCEGAP_AGENT_MAX_STEPS": "9",
+            "EVIDENCEGAP_AGENT_TOTAL_SEARCH_BUDGET": "4",
+            "EVIDENCEGAP_AGENT_PER_CLAIM_SEARCH_BUDGET": "2",
+            "EVIDENCEGAP_AGENT_CHECKPOINT_ENABLED": "false",
+            "EVIDENCEGAP_AGENT_CONTROLLER_MODEL": "deepseek-v4-pro",
+        }
+    )
+    assert not config.agent.enabled
+    assert config.agent.max_steps == 9
+    assert config.agent.total_search_budget == 4
+    assert config.agent.per_claim_search_budget == 2
+    assert not config.agent.checkpoint_enabled
+    assert config.agent_controller_llm is not None
+    assert config.agent_controller_llm.model == "deepseek-v4-pro"
+    assert "agent" in config.safe_dict()
+
+
+def test_prompt_override_is_used_and_recorded(tmp_path: Path, monkeypatch) -> None:
     from evidencegap_backend.pipeline.statement_decomposition import (
         run_statement_decomposition,
     )
@@ -201,9 +221,7 @@ def test_builtin_prompts_are_packaged_and_rendered() -> None:
     gap = load_builtin_prompt("inference_gap.txt")
     localization = load_builtin_prompt("localization.txt")
 
-    assert decomposition.startswith(
-        "You perform argument-preserving decomposition"
-    )
+    assert decomposition.startswith("You perform argument-preserving decomposition")
     assert "at most 7 sentences" in article
     assert "{{max_evidence_sentences}}" not in article
     assert gap.startswith("You analyze evidence gaps")

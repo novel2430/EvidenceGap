@@ -1,0 +1,7 @@
+{
+  "dependencies": ["./backend"],
+  "graphs": {
+    "evidencegap_agent": "./backend/evidencegap_backend/agent/studio.py:graph"
+  },
+  "env": ".env"
+}

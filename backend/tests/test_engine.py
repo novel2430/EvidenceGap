@@ -78,12 +78,11 @@ def test_engine_reuses_loaded_resources_and_returns_bundle(
         assert kwargs["stage_configs"] == config.llm_stages
         assert kwargs["pipeline_config"] == config.pipeline
         assert kwargs["resolved_config_snapshot"] == config.safe_dict()
+        assert callable(kwargs["statement_analysis_runner"])
         return {
             "artifact_dir": str(artifact_dir.relative_to(tmp_path)),
             "presentation_bundle_path": str(presentation_path.relative_to(tmp_path)),
-            "presentation_bundle": {
-                "contract_id": "phase077.presentation-bundle.v1"
-            },
+            "presentation_bundle": {"contract_id": "phase077.presentation-bundle.v1"},
         }
 
     monkeypatch.setattr("evidencegap_backend.engine.run_statement_pipeline", fake_run)
@@ -110,6 +109,43 @@ def test_engine_reuses_loaded_resources_and_returns_bundle(
     assert not engine.loaded
 
 
+def test_engine_legacy_switch_omits_agent_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from evidencegap_backend import AgentConfig
+
+    config = BackendConfig(
+        workspace_root=tmp_path, provider="deepseek", agent=AgentConfig(enabled=False)
+    )
+    resources = FakeResources()
+    engine = EvidenceGapEngine(config, resources=resources)  # type: ignore[arg-type]
+    engine.load(validate_resources=False)
+    artifact_dir = config.artifact_root / "legacy"
+    presentation_path = artifact_dir / "output/presentation_bundle.json"
+    presentation_path.parent.mkdir(parents=True)
+    presentation_path.write_text("{}\n", encoding="utf-8")
+
+    def fake_run(*args: object, **kwargs: object) -> dict[str, object]:
+        assert "statement_analysis_runner" not in kwargs
+        return {
+            "artifact_dir": str(artifact_dir.relative_to(tmp_path)),
+            "presentation_bundle_path": str(presentation_path.relative_to(tmp_path)),
+            "presentation_bundle": {},
+        }
+
+    monkeypatch.setattr("evidencegap_backend.engine.run_statement_pipeline", fake_run)
+    monkeypatch.setattr(
+        "evidencegap_backend.engine.validate_statement_pipeline_artifact",
+        lambda path: {"status": "PASS"},
+    )
+    assert (
+        engine.analyze_statement(
+            statement="claim", run_name="legacy"
+        ).presentation_bundle
+        == {}
+    )
+
+
 def test_engine_uses_configured_default_language(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -127,7 +163,7 @@ def test_engine_uses_configured_default_language(
     artifact_dir = config.artifact_root / "default-language"
     presentation_path = artifact_dir / "output/presentation_bundle.json"
     presentation_path.parent.mkdir(parents=True)
-    presentation_path.write_text('{}\n', encoding="utf-8")
+    presentation_path.write_text("{}\n", encoding="utf-8")
 
     def fake_run(*args: object, **kwargs: object) -> dict[str, object]:
         assert kwargs["language"] == "繁體中文（台灣）"

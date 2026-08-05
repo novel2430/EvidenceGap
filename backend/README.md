@@ -1,5 +1,69 @@
 # EvidenceGap Backend Runtime
 
+EvidenceGap now runs as a constrained LangGraph Evidence Agent Harness by
+default. The public `EvidenceGapEngine`, FastAPI URLs, request schemas, progress
+stages, and presentation bundle remain unchanged. Set
+`EVIDENCEGAP_AGENT_ENABLED=false` to use the retained fixed workflow.
+
+The Agent Controller sees a compact, JSON-serializable Evidence Workspace and
+chooses one structured action: `SEARCH`, `RESOLVE`, `ABSTAIN`, or `FINISH`.
+`SEARCH` is the only high-level tool exposed to it. That tool wraps the existing
+BM25 + MedCPT + BMRetriever retrieval, RRF, Cross-Encoder reranking, article
+evidence Judge, deterministic claim aggregation, and final evidence graph. A
+controller query affects retrieval and reranking only; the canonical claim still
+defines the Claim ID, Judge hypothesis, aggregation, and downstream bundle.
+
+LangGraph owns explicit state, conditional routing, the Controller → Tool →
+Workspace loop, and SQLite checkpointing. Ordinary code validates every action,
+enforces total/per-claim budgets and duplicate-query guards, selects a real
+successful attempt, and supplies deterministic fallback decisions. The
+Controller never creates the formal medical verdict.
+
+Each successful run adds these auditable files under `<run>/agent/`:
+
+```text
+workspace.json
+action_trace.jsonl
+agent_manifest.json
+execution_graph.mmd
+checkpoints.sqlite
+```
+
+Run the network/GPU-free smoke test (it executes the real compiled graph with a
+fake controller and fake search implementation):
+
+```bash
+source .venv/bin/activate
+python -m pip install -e './backend[test,agent-dev]'
+python -m evidencegap_backend.agent.demo_fake
+```
+
+Open the same graph topology in LangGraph Studio from the repository root:
+
+```bash
+langgraph dev
+```
+
+Useful Agent settings are available in `config.json` under `agent`, or through:
+
+```text
+EVIDENCEGAP_AGENT_ENABLED
+EVIDENCEGAP_AGENT_MAX_STEPS
+EVIDENCEGAP_AGENT_TOTAL_SEARCH_BUDGET
+EVIDENCEGAP_AGENT_PER_CLAIM_SEARCH_BUDGET
+EVIDENCEGAP_AGENT_CONTROLLER_RETRY_COUNT
+EVIDENCEGAP_AGENT_CHECKPOINT_ENABLED
+EVIDENCEGAP_AGENT_CONTROLLER_PROVIDER
+EVIDENCEGAP_AGENT_CONTROLLER_MODEL
+EVIDENCEGAP_AGENT_CONTROLLER_API_KEY_ENV
+EVIDENCEGAP_AGENT_CONTROLLER_BASE_URL
+EVIDENCEGAP_AGENT_CONTROLLER_MAX_TOKENS
+EVIDENCEGAP_AGENT_CONTROLLER_THINKING
+```
+
+Studio is a development/trace surface only; FastAPI remains the production
+entry point and no second business pipeline or server contract is introduced.
+
 `backend/` is the independent online implementation of the current EvidenceGap
 07.7 statement-to-presentation pipeline. It does not import `src/evidencegap`,
 does not depend on the old CLI, and does not use subprocesses.
@@ -82,7 +146,7 @@ run state is stored atomically under `artifacts/v1/api_runs/`, while the normal
 Install the API and test dependencies:
 
 ```bash
-python -m pip install -e './backend[test]'
+python -m pip install -e './backend[test,agent-dev]'
 ```
 
 Minimal environment:
@@ -189,6 +253,7 @@ statement_decomposition
 article_evidence
 inference_gap
 localization
+agent_controller
 ```
 
 Global environment variables such as `EVIDENCEGAP_MODEL` override all JSON

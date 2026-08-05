@@ -18,7 +18,10 @@ from evidencegap_backend.common import (
     find_workspace_root,
 )
 from evidencegap_backend.config import LLMStageConfig, PipelineConfig
-from evidencegap_backend.output.presentation import run_output_module, validate_output_artifact
+from evidencegap_backend.output.presentation import (
+    run_output_module,
+    validate_output_artifact,
+)
 from evidencegap_backend.pipeline.inference_gap_analysis import (
     run_inference_gap_analysis,
     validate_inference_gap_analysis_artifact,
@@ -150,9 +153,11 @@ def build_execution_summary(
 ) -> dict[str, Any]:
     if set(stage_dirs) != set(_STAGE_NAMES):
         raise EvidenceGapError("Execution summary stage set is incomplete")
-    if isinstance(total_seconds, bool) or not math.isfinite(
-        float(total_seconds)
-    ) or total_seconds < 0:
+    if (
+        isinstance(total_seconds, bool)
+        or not math.isfinite(float(total_seconds))
+        or total_seconds < 0
+    ):
         raise EvidenceGapError("Execution summary total_seconds cannot be negative")
     return {
         "total_seconds": float(total_seconds),
@@ -241,6 +246,7 @@ def run_statement_pipeline(
     pipeline_config: PipelineConfig | None = None,
     resolved_config_snapshot: Mapping[str, Any] | None = None,
     progress_callback: ProgressCallback | None = None,
+    statement_analysis_runner: Callable[..., dict[str, Any]] | None = None,
     force: bool = False,
 ) -> dict[str, Any]:
     root = root.resolve()
@@ -262,7 +268,9 @@ def run_statement_pipeline(
             timeout_seconds,
         )
     ):
-        raise EvidenceGapError("Run token, batch, and timeout parameters must be positive")
+        raise EvidenceGapError(
+            "Run token, batch, and timeout parameters must be positive"
+        )
     if max_retries < 0:
         raise EvidenceGapError("max_retries cannot be negative")
 
@@ -312,10 +320,12 @@ def run_statement_pipeline(
     }
     llm_stages = dict(legacy_stage_configs)
     if stage_configs is not None:
-        unknown = set(stage_configs) - set(llm_stages)
+        unknown = set(stage_configs) - (set(llm_stages) | {"agent_controller"})
         if unknown:
-            raise EvidenceGapError(f"Unknown LLM stage configuration: {sorted(unknown)}")
-        llm_stages.update(stage_configs)
+            raise EvidenceGapError(
+                f"Unknown LLM stage configuration: {sorted(unknown)}"
+            )
+        llm_stages.update({k: v for k, v in stage_configs.items() if k in llm_stages})
     decomposition_stage = llm_stages["statement_decomposition"]
     article_stage = llm_stages["article_evidence"]
     gap_stage = llm_stages["inference_gap"]
@@ -402,17 +412,17 @@ def run_statement_pipeline(
         total_units=total_claims,
     )
 
-    def claim_progress(completed: int, total: int) -> None:
+    def claim_progress(completed: int, total: int, message: str | None = None) -> None:
         _emit_progress(
             progress_callback,
             stage="claim_analysis",
             stage_index=2,
-            message=f"Analyzed {completed} of {total} claims",
+            message=message or f"Analyzed {completed} of {total} claims",
             completed_units=completed,
             total_units=total,
         )
 
-    analysis_result = run_statement_analysis(
+    analysis_result = (statement_analysis_runner or run_statement_analysis)(
         root,
         decomposition_artifact_dir=decomposition_dir,
         run_name=_STAGE_NAMES["analysis"],
@@ -445,9 +455,7 @@ def run_statement_pipeline(
         cache_dir=cache_dir,
         runtime_resources=runtime_resources,
         decomposition_bundle=(
-            decomposition_value
-            if isinstance(decomposition_value, Mapping)
-            else None
+            decomposition_value if isinstance(decomposition_value, Mapping) else None
         ),
         progress_callback=claim_progress,
         force=False,
@@ -551,9 +559,7 @@ def run_statement_pipeline(
     output_dir = target / _STAGE_NAMES["output"]
     presentation_path = output_dir / "presentation_bundle.json"
 
-    stage_dirs = {
-        key: target / directory for key, directory in _STAGE_NAMES.items()
-    }
+    stage_dirs = {key: target / directory for key, directory in _STAGE_NAMES.items()}
     stage_artifacts = {
         key: _stage_meta(root, target / directory)
         for key, directory in _STAGE_NAMES.items()
@@ -578,9 +584,7 @@ def run_statement_pipeline(
         }
     )
     total_seconds = round(time.perf_counter() - started, 6)
-    execution_summary = build_execution_summary(
-        stage_dirs, total_seconds=total_seconds
-    )
+    execution_summary = build_execution_summary(stage_dirs, total_seconds=total_seconds)
     manifest = {
         "schema_version": STATEMENT_RUN_SCHEMA_VERSION,
         "contract_id": STATEMENT_RUN_CONTRACT_ID,
@@ -621,9 +625,7 @@ def run_statement_pipeline(
                 resolved_gap_thinking if gap_stage.provider == "deepseek" else None
             ),
             "resource_lifecycle": (
-                "engine_resident"
-                if runtime_resources is not None
-                else "per_call"
+                "engine_resident" if runtime_resources is not None else "per_call"
             ),
             "stage_handoff": "in_memory_with_artifact_persistence",
         },
@@ -656,6 +658,23 @@ def run_statement_pipeline(
         },
         "seconds": total_seconds,
     }
+    agent_manifest_path = target / "agent" / "agent_manifest.json"
+    if agent_manifest_path.is_file():
+        manifest["agent"] = {
+            "artifact_dir": relative_path(root, target / "agent"),
+            "manifest": {
+                "path": relative_path(root, agent_manifest_path),
+                "sha256": sha256_file(agent_manifest_path),
+            },
+            "action_trace": {
+                "path": relative_path(root, target / "agent" / "action_trace.jsonl"),
+                "sha256": sha256_file(target / "agent" / "action_trace.jsonl"),
+            },
+            "workspace": {
+                "path": relative_path(root, target / "agent" / "workspace.json"),
+                "sha256": sha256_file(target / "agent" / "workspace.json"),
+            },
+        }
     atomic_write_json(target / "run_manifest.json", manifest)
 
     return {
@@ -752,28 +771,35 @@ def validate_statement_pipeline_artifact(artifact_dir: Path) -> dict[str, Any]:
     output_validation = validate_output_artifact(stage_dirs["output"])
 
     analysis_request = _read_json_object(stage_dirs["analysis"] / "request.json")
-    if _resolve(
-        root, str(analysis_request.get("decomposition_artifact_dir") or "")
-    ) != stage_dirs["decomposition"]:
+    if (
+        _resolve(root, str(analysis_request.get("decomposition_artifact_dir") or ""))
+        != stage_dirs["decomposition"]
+    ):
         raise EvidenceGapError("Statement run analysis source mismatch")
     bundle_manifest = _read_json_object(stage_dirs["bundle"] / "run_manifest.json")
     bundle_source = bundle_manifest.get("source")
-    if not isinstance(bundle_source, Mapping) or _resolve(
-        root, str(bundle_source.get("statement_analysis_artifact_dir") or "")
-    ) != stage_dirs["analysis"]:
+    if (
+        not isinstance(bundle_source, Mapping)
+        or _resolve(
+            root, str(bundle_source.get("statement_analysis_artifact_dir") or "")
+        )
+        != stage_dirs["analysis"]
+    ):
         raise EvidenceGapError("Statement run bundle source mismatch")
 
     gap_request = _read_json_object(stage_dirs["gaps"] / "request.json")
-    if _resolve(
-        root, str(gap_request.get("statement_bundle_artifact_dir") or "")
-    ) != stage_dirs["bundle"]:
+    if (
+        _resolve(root, str(gap_request.get("statement_bundle_artifact_dir") or ""))
+        != stage_dirs["bundle"]
+    ):
         raise EvidenceGapError("Statement run gap source mismatch")
     output_request = _read_json_object(stage_dirs["output"] / "request.json")
-    if _resolve(
-        root, str(output_request.get("statement_bundle_artifact_dir") or "")
-    ) != stage_dirs["bundle"] or _resolve(
-        root, str(output_request.get("inference_gap_artifact_dir") or "")
-    ) != stage_dirs["gaps"]:
+    if (
+        _resolve(root, str(output_request.get("statement_bundle_artifact_dir") or ""))
+        != stage_dirs["bundle"]
+        or _resolve(root, str(output_request.get("inference_gap_artifact_dir") or ""))
+        != stage_dirs["gaps"]
+    ):
         raise EvidenceGapError("Statement run output source mismatch")
 
     statement_ids = {

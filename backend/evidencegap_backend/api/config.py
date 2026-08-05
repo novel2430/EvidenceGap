@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from evidencegap_backend.common import EvidenceGapError
 from evidencegap_backend.config import (
+    AgentConfig,
     BackendConfig,
     LLMStageConfig,
     PipelineConfig,
@@ -25,6 +26,7 @@ _STAGE_ENV_PREFIXES = {
     "article_evidence": "ARTICLE_EVIDENCE",
     "inference_gap": "INFERENCE_GAP",
     "localization": "LOCALIZATION",
+    "agent_controller": "AGENT_CONTROLLER",
 }
 
 
@@ -155,7 +157,9 @@ def load_config_document(
         path = (Path.cwd() / path).resolve()
     if not path.exists():
         if explicit:
-            raise EvidenceGapError(f"Configured EVIDENCEGAP_CONFIG does not exist: {path}")
+            raise EvidenceGapError(
+                f"Configured EVIDENCEGAP_CONFIG does not exist: {path}"
+            )
         return ConfigDocument(path=None, base_dir=workspace_hint, data={})
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -182,17 +186,14 @@ def _prompt_override(
     prompt = _mapping(stage.get("prompt"), label=f"llm.stages.{stage_name}.prompt")
     prefix = _STAGE_ENV_PREFIXES[stage_name]
 
-    system_file_value = (
-        _value(environ, f"EVIDENCEGAP_{prefix}_PROMPT_FILE")
-        or _text(prompt.get("system_file"))
+    system_file_value = _value(environ, f"EVIDENCEGAP_{prefix}_PROMPT_FILE") or _text(
+        prompt.get("system_file")
     )
-    additional_file_value = (
-        _value(environ, f"EVIDENCEGAP_{prefix}_PROMPT_EXTRA_FILE")
-        or _text(prompt.get("additional_instructions_file"))
-    )
-    version = (
-        _value(environ, f"EVIDENCEGAP_{prefix}_PROMPT_VERSION")
-        or _text(prompt.get("version"))
+    additional_file_value = _value(
+        environ, f"EVIDENCEGAP_{prefix}_PROMPT_EXTRA_FILE"
+    ) or _text(prompt.get("additional_instructions_file"))
+    version = _value(environ, f"EVIDENCEGAP_{prefix}_PROMPT_VERSION") or _text(
+        prompt.get("version")
     )
 
     system_prompt: str | None = None
@@ -298,14 +299,18 @@ def _stage_llm_config(
         or global_base_url_env
         or _text(stage.get("base_url"))
         or (default_base_url if same_as_default_provider else None)
-        or _provider_default(provider, DEFAULT_BASE_URLS, label=f"{stage_name}.provider")
+        or _provider_default(
+            provider, DEFAULT_BASE_URLS, label=f"{stage_name}.provider"
+        )
     )
 
     stage_tokens_env = _value(environ, f"EVIDENCEGAP_{prefix}_MAX_TOKENS")
     if stage_name == "article_evidence":
         stage_tokens_env = stage_tokens_env or _value(environ, "EVIDENCEGAP_MAX_TOKENS")
     elif stage_name == "inference_gap":
-        stage_tokens_env = stage_tokens_env or _value(environ, "EVIDENCEGAP_GAP_MAX_TOKENS")
+        stage_tokens_env = stage_tokens_env or _value(
+            environ, "EVIDENCEGAP_GAP_MAX_TOKENS"
+        )
     elif stage_name == "localization":
         stage_tokens_env = stage_tokens_env or _value(
             environ, "EVIDENCEGAP_TRANSLATION_MAX_TOKENS"
@@ -420,9 +425,7 @@ def backend_config_from_env(
 
     configured_workspace = _resolve_from(doc.base_dir, data.get("workspace_root"))
     workspace_root = Path(
-        _value(env, "EVIDENCEGAP_WORKSPACE_ROOT")
-        or configured_workspace
-        or Path.cwd()
+        _value(env, "EVIDENCEGAP_WORKSPACE_ROOT") or configured_workspace or Path.cwd()
     ).resolve()
 
     configured_default_provider = (
@@ -437,15 +440,13 @@ def backend_config_from_env(
     default_model = (
         _value(env, "EVIDENCEGAP_MODEL")
         or (None if provider_changed_by_env else _text(llm_defaults.get("model")))
-        or _provider_default(default_provider, DEFAULT_MODELS, label="llm.defaults.provider")
+        or _provider_default(
+            default_provider, DEFAULT_MODELS, label="llm.defaults.provider"
+        )
     )
     default_api_key_env = (
         _value(env, "EVIDENCEGAP_API_KEY_ENV")
-        or (
-            None
-            if provider_changed_by_env
-            else _text(llm_defaults.get("api_key_env"))
-        )
+        or (None if provider_changed_by_env else _text(llm_defaults.get("api_key_env")))
         or _provider_default(
             default_provider, DEFAULT_API_KEY_ENVS, label="llm.defaults.provider"
         )
@@ -524,6 +525,19 @@ def backend_config_from_env(
         default_thinking=False,
         default_request_batch_size=32,
     )
+    agent_controller = _stage_llm_config(
+        document=doc,
+        stage_name="agent_controller",
+        environ=env,
+        default_provider=default_provider,
+        default_model=default_model,
+        default_api_key_env=default_api_key_env,
+        default_base_url=default_base_url,
+        default_max_tokens=1200,
+        default_timeout_seconds=default_timeout,
+        default_max_retries=default_retries,
+        default_thinking=False,
+    )
 
     pipeline = PipelineConfig(
         source_depth=_int(
@@ -557,6 +571,40 @@ def backend_config_from_env(
             int(article_evidence_pipeline.get("max_evidence_sentences", 5)),
         ),
     )
+    agent_data = _mapping(data.get("agent"), label="agent")
+    agent = AgentConfig(
+        enabled=_bool(
+            env,
+            "EVIDENCEGAP_AGENT_ENABLED",
+            _bool_value(agent_data.get("enabled", True), label="agent.enabled"),
+        ),
+        max_steps=_int(
+            env, "EVIDENCEGAP_AGENT_MAX_STEPS", int(agent_data.get("max_steps", 20))
+        ),
+        total_search_budget=_int(
+            env,
+            "EVIDENCEGAP_AGENT_TOTAL_SEARCH_BUDGET",
+            int(agent_data.get("total_search_budget", 8)),
+        ),
+        per_claim_search_budget=_int(
+            env,
+            "EVIDENCEGAP_AGENT_PER_CLAIM_SEARCH_BUDGET",
+            int(agent_data.get("per_claim_search_budget", 3)),
+        ),
+        controller_retry_count=_int(
+            env,
+            "EVIDENCEGAP_AGENT_CONTROLLER_RETRY_COUNT",
+            int(agent_data.get("controller_retry_count", 2)),
+        ),
+        checkpoint_enabled=_bool(
+            env,
+            "EVIDENCEGAP_AGENT_CHECKPOINT_ENABLED",
+            _bool_value(
+                agent_data.get("checkpoint_enabled", True),
+                label="agent.checkpoint_enabled",
+            ),
+        ),
+    )
 
     def resource_path(env_name: str, key: str) -> Path | None:
         env_path = _path(env, env_name)
@@ -569,7 +617,9 @@ def backend_config_from_env(
         workspace_root=workspace_root,
         provider=default_provider,
         model=default_model,
-        device=_value(env, "EVIDENCEGAP_DEVICE") or _text(runtime.get("device")) or "cuda:0",
+        device=_value(env, "EVIDENCEGAP_DEVICE")
+        or _text(runtime.get("device"))
+        or "cuda:0",
         amp=_value(env, "EVIDENCEGAP_AMP") or _text(runtime.get("amp")) or "fp16",
         artifact_root=resource_path("EVIDENCEGAP_ARTIFACT_ROOT", "artifact_root"),
         corpus_dir=resource_path("EVIDENCEGAP_CORPUS_DIR", "corpus_dir"),
@@ -635,7 +685,9 @@ def backend_config_from_env(
         article_evidence_llm=article_evidence,
         inference_gap_llm=inference_gap,
         localization_llm=localization,
+        agent_controller_llm=agent_controller,
         pipeline=pipeline,
+        agent=agent,
     )
 
 

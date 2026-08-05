@@ -22,7 +22,11 @@ from evidencegap_backend.common import (
     sha256_file,
     sha256_text,
 )
-from evidencegap_backend.dense.encoders import DenseEncoder, encoder_spec, model_fingerprint
+from evidencegap_backend.dense.encoders import (
+    DenseEncoder,
+    encoder_spec,
+    model_fingerprint,
+)
 
 if TYPE_CHECKING:
     from evidencegap_backend.resources import RuntimeResources
@@ -97,7 +101,9 @@ def _write_jsonl_atomic(path: Path, rows: Iterable[Mapping[str, Any]]) -> int:
     count = 0
     with temp.open("w", encoding="utf-8") as handle:
         for row in rows:
-            handle.write(json.dumps(dict(row), ensure_ascii=False, sort_keys=True) + "\n")
+            handle.write(
+                json.dumps(dict(row), ensure_ascii=False, sort_keys=True) + "\n"
+            )
             count += 1
     os.replace(temp, path)
     return count
@@ -207,8 +213,6 @@ def fuse_article_rankings(
     return values
 
 
-
-
 def _query_dense_source(
     root: Path,
     *,
@@ -235,19 +239,18 @@ def _query_dense_source(
                 f"{backend.manifest.get('model_key')}"
             )
         index_path = index_dir / "index.faiss"
-        expected_index_sha256 = str(
-            backend.manifest.get("index", {}).get("sha256", "")
-        )
-        if not expected_index_sha256 or sha256_file(index_path) != expected_index_sha256:
+        expected_index_sha256 = str(backend.manifest.get("index", {}).get("sha256", ""))
+        if (
+            not expected_index_sha256
+            or sha256_file(index_path) != expected_index_sha256
+        ):
             raise EvidenceGapError(f"{model_key} FAISS index checksum mismatch")
         if int(backend.index.ntotal) != len(article_ids):
             raise EvidenceGapError(
                 f"{model_key} FAISS/article ID row mismatch: "
                 f"{backend.index.ntotal} != {len(article_ids)}"
             )
-        embedding_manifest_value = backend.manifest.get(
-            "article_embedding_manifest"
-        )
+        embedding_manifest_value = backend.manifest.get("article_embedding_manifest")
         if not embedding_manifest_value:
             raise EvidenceGapError(
                 f"{model_key} FAISS manifest has no article embedding manifest"
@@ -256,7 +259,10 @@ def _query_dense_source(
         if not embedding_manifest_path.is_absolute():
             embedding_manifest_path = root / embedding_manifest_path
         embedding_manifest = load_json(embedding_manifest_path)
-        if embedding_manifest.get("article_input_sha256") != expected_article_input_sha256:
+        if (
+            embedding_manifest.get("article_input_sha256")
+            != expected_article_input_sha256
+        ):
             raise EvidenceGapError(
                 f"{model_key} FAISS index was built from a different article input"
             )
@@ -289,9 +295,7 @@ def _query_dense_source(
             "article_embedding_manifest_path": relative_path(
                 root, embedding_manifest_path
             ),
-            "article_embedding_manifest_sha256": sha256_file(
-                embedding_manifest_path
-            ),
+            "article_embedding_manifest_sha256": sha256_file(embedding_manifest_path),
             "article_input_sha256": expected_article_input_sha256,
             "requested_nprobe": nprobe,
             "actual_nprobe": backend.nprobe,
@@ -314,7 +318,9 @@ def _load_article_texts(
     if not article_input_path.exists():
         raise EvidenceGapError(f"Missing Phase 03 article inputs: {article_input_path}")
     if not corpus_articles_path.exists():
-        raise EvidenceGapError(f"Missing Phase 02 article corpus: {corpus_articles_path}")
+        raise EvidenceGapError(
+            f"Missing Phase 02 article corpus: {corpus_articles_path}"
+        )
     pa, _pq = _pyarrow()
     candidate_table = pa.Table.from_pylist(
         [{"article_id": str(article_id)} for article_id in article_ids]
@@ -322,8 +328,9 @@ def _load_article_texts(
     connection = _duckdb().connect()
     try:
         connection.register("runtime_candidates", candidate_table)
-        rows = connection.execute(
-            f"""
+        rows = (
+            connection.execute(
+                f"""
             SELECT
                 CAST(i.article_id AS VARCHAR) AS article_id,
                 CAST(i.doc_idx AS BIGINT) AS doc_idx,
@@ -336,7 +343,10 @@ def _load_article_texts(
             LEFT JOIN read_parquet('{_quote(corpus_articles_path)}') a
               ON CAST(i.article_id AS VARCHAR) = CAST(a.article_id AS VARCHAR)
             """
-        ).fetch_arrow_table().to_pylist()
+            )
+            .fetch_arrow_table()
+            .to_pylist()
+        )
     finally:
         connection.close()
     result = {str(row["article_id"]): dict(row) for row in rows}
@@ -353,6 +363,7 @@ def retrieve_runtime_articles(
     *,
     claim_id: str,
     claim_text: str,
+    query_text: str | None = None,
     artifact_dir: Path,
     device: str = "cuda:0",
     amp: str = "fp16",
@@ -373,6 +384,7 @@ def retrieve_runtime_articles(
 ) -> dict[str, Any]:
     root = root.resolve()
     claim_text = _clean_claim(claim_text)
+    query_text = _clean_claim(query_text or claim_text)
     corpus_dir = _resolve(root, corpus_dir, DEFAULT_CORPUS_DIR)
     article_input_dir = _resolve(root, article_input_dir, DEFAULT_ARTICLE_INPUT_DIR)
     bm25_index_dir = _resolve(root, bm25_index_dir, DEFAULT_BM25_INDEX_DIR)
@@ -417,9 +429,7 @@ def retrieve_runtime_articles(
         expected_corpus_articles_sha256 = (
             runtime_resources.expected_corpus_articles_sha256
         )
-        expected_article_input_sha256 = (
-            runtime_resources.expected_article_input_sha256
-        )
+        expected_article_input_sha256 = runtime_resources.expected_article_input_sha256
         bm25_backend = runtime_resources.bm25
         if bm25_backend is None:
             raise EvidenceGapError("Runtime BM25 resource is unavailable")
@@ -436,9 +446,9 @@ def retrieve_runtime_articles(
         )
         if not expected_corpus_articles_sha256 or not expected_article_input_sha256:
             raise EvidenceGapError("Article corpus/input manifests are incomplete")
-        if article_input_manifest.get(
-            "source_corpus_manifest_sha256"
-        ) != sha256_file(corpus_manifest_path):
+        if article_input_manifest.get("source_corpus_manifest_sha256") != sha256_file(
+            corpus_manifest_path
+        ):
             raise EvidenceGapError(
                 "Phase 03 article inputs do not match the Phase 02 corpus"
             )
@@ -452,13 +462,14 @@ def retrieve_runtime_articles(
             bm25_index_dir / "article_ids.npy"
         ):
             raise EvidenceGapError("BM25 article ID map checksum mismatch")
-        if bm25_backend.manifest.get("corpus", {}).get(
-            "articles_sha256"
-        ) != expected_corpus_articles_sha256:
+        if (
+            bm25_backend.manifest.get("corpus", {}).get("articles_sha256")
+            != expected_corpus_articles_sha256
+        ):
             raise EvidenceGapError(
                 "BM25 index does not match the Phase 02 article corpus"
             )
-    bm25_hits = bm25_backend.search(claim_text, top_k=source_depth)
+    bm25_hits = bm25_backend.search(query_text, top_k=source_depth)
     bm25_rows = [
         {
             "rank": int(hit.rank),
@@ -476,16 +487,16 @@ def retrieve_runtime_articles(
 
     if runtime_resources is not None:
         medcpt_rows, medcpt_meta = runtime_resources.query_dense(
-            "medcpt", claim_text, top_k=source_depth
+            "medcpt", query_text, top_k=source_depth
         )
         bmretriever_rows, bmretriever_meta = runtime_resources.query_dense(
-            "bmretriever", claim_text, top_k=source_depth
+            "bmretriever", query_text, top_k=source_depth
         )
     else:
         medcpt_rows, medcpt_meta = _query_dense_source(
             root,
             model_key="medcpt",
-            claim_text=claim_text,
+            claim_text=query_text,
             device=device,
             amp=amp,
             index_dir=medcpt_index_dir,
@@ -497,7 +508,7 @@ def retrieve_runtime_articles(
         bmretriever_rows, bmretriever_meta = _query_dense_source(
             root,
             model_key="bmretriever",
-            claim_text=claim_text,
+            claim_text=query_text,
             device=device,
             amp=amp,
             index_dir=bmretriever_index_dir,
@@ -549,14 +560,14 @@ def retrieve_runtime_articles(
 
     reranked = (
         runtime_resources.score_articles(
-            claim_text=claim_text,
+            claim_text=query_text,
             articles=fused,
             batch_size=cross_encoder_batch_size,
         )
         if runtime_resources is not None
         else score_runtime_article_pairs(
             root,
-            claim_text=claim_text,
+            claim_text=query_text,
             articles=fused,
             model_dir=cross_encoder_model_dir,
             device=device,
@@ -570,7 +581,9 @@ def retrieve_runtime_articles(
         for row in reranked["scores"]
     }
     if set(ce_scores) != {str(row["article_id"]) for row in fused}:
-        raise EvidenceGapError("Cross-encoder output does not cover the configured RRF candidate set")
+        raise EvidenceGapError(
+            "Cross-encoder output does not cover the configured RRF candidate set"
+        )
     for row in fused:
         row["cross_encoder_score"] = ce_scores[str(row["article_id"])]
     fused.sort(
@@ -590,6 +603,7 @@ def retrieve_runtime_articles(
                 "record_type": ARTICLE_RECORD_TYPE,
                 "claim_id": claim_id,
                 "claim_text": claim_text,
+                "retrieval_query": query_text,
                 **row,
                 "final_article_rank": final_rank,
             }
@@ -650,6 +664,8 @@ def retrieve_runtime_articles(
             "created_at": datetime.now(timezone.utc).isoformat(),
             "claim_id": claim_id,
             "claim_text_sha256": sha256_text(claim_text),
+            "retrieval_query": query_text,
+            "retrieval_query_sha256": sha256_text(query_text),
             "parameters": {
                 "source_depth": source_depth,
                 "dense_nprobe": dense_nprobe,
@@ -661,9 +677,7 @@ def retrieve_runtime_articles(
                 "max_length": 512,
                 "amp": amp,
                 "resource_lifecycle": (
-                    "engine_resident"
-                    if runtime_resources is not None
-                    else "per_call"
+                    "engine_resident" if runtime_resources is not None else "per_call"
                 ),
             },
             "sources": {
@@ -680,13 +694,9 @@ def retrieve_runtime_articles(
                     "path": relative_path(
                         root, article_input_dir / "article_inputs.parquet"
                     ),
-                    "manifest_sha256": sha256_file(
-                        article_input_manifest_path
-                    ),
+                    "manifest_sha256": sha256_file(article_input_manifest_path),
                     "article_input_sha256": expected_article_input_sha256,
-                    "source_corpus_manifest_sha256": sha256_file(
-                        corpus_manifest_path
-                    ),
+                    "source_corpus_manifest_sha256": sha256_file(corpus_manifest_path),
                 },
                 "cross_encoder": reranked["metadata"],
             },

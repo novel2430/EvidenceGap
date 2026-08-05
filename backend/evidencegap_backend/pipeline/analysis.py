@@ -107,6 +107,7 @@ def run_analysis(
     root: Path,
     *,
     claim: str,
+    retrieval_query: str | None = None,
     run_name: str,
     provider: str,
     model: str | None = None,
@@ -140,6 +141,7 @@ def run_analysis(
 ) -> dict[str, Any]:
     root = root.resolve()
     claim_text = _clean_claim(claim)
+    query_text = _clean_claim(retrieval_query or claim_text)
     claim_id = runtime_claim_id(claim_text)
     name = _safe_name(run_name)
     base = artifact_root.resolve() if artifact_root else (root / DEFAULT_ARTIFACT_ROOT)
@@ -159,6 +161,8 @@ def run_analysis(
             "claim_id": claim_id,
             "claim_text": claim_text,
             "claim_text_sha256": sha256_text(claim_text),
+            "retrieval_query": query_text,
+            "retrieval_query_sha256": sha256_text(query_text),
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
     )
@@ -167,6 +171,7 @@ def run_analysis(
         root,
         claim_id=claim_id,
         claim_text=claim_text,
+        query_text=query_text,
         artifact_dir=target / _STAGE_DIRS["article_retrieval"],
         device=device,
         amp=amp,
@@ -206,9 +211,7 @@ def run_analysis(
         artifact_root=target,
         force=False,
         splitter=(
-            None
-            if runtime_resources is None
-            else runtime_resources.sentence_splitter
+            None if runtime_resources is None else runtime_resources.sentence_splitter
         ),
         runtime_articles=(
             article_result.get("top_article_rows")
@@ -220,9 +223,7 @@ def run_analysis(
     article_rows_value = article_result.get("top_article_rows")
     sentence_rows_value = sentence_result.get("runtime_sentence_rows")
     prompt_kwargs: dict[str, Any] = {}
-    if isinstance(article_rows_value, list) and isinstance(
-        sentence_rows_value, list
-    ):
+    if isinstance(article_rows_value, list) and isinstance(sentence_rows_value, list):
         prompt_kwargs = {
             "prompt_request": {
                 "claim_id": claim_id,
@@ -272,9 +273,7 @@ def run_analysis(
     )
     claim_result_value = aggregation_result.get("claim_result")
     graph_kwargs: dict[str, Any] = {}
-    if isinstance(claim_result_value, dict) and isinstance(
-        article_evidence_rows, list
-    ):
+    if isinstance(claim_result_value, dict) and isinstance(article_evidence_rows, list):
         graph_kwargs = {
             "claim_result": claim_result_value,
             "article_rows": article_evidence_rows,
@@ -302,6 +301,7 @@ def run_analysis(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "claim_id": claim_id,
         "claim_text_sha256": sha256_text(claim_text),
+        "retrieval_query_sha256": sha256_text(query_text),
         "pipeline": [
             "phase04_runtime_article_retrieval",
             "phase07_runtime_sentence_materialization",
@@ -328,9 +328,7 @@ def run_analysis(
             "section_mode": section_mode,
             "allow_cpu_fallback": allow_cpu_fallback,
             "resource_lifecycle": (
-                "engine_resident"
-                if runtime_resources is not None
-                else "per_call"
+                "engine_resident" if runtime_resources is not None else "per_call"
             ),
             "stage_handoff": "in_memory_with_artifact_persistence",
         },
@@ -387,6 +385,14 @@ def validate_analysis_artifact(artifact_dir: Path) -> dict[str, Any]:
         raise EvidenceGapError("Unexpected analysis request schema_version")
     if request.get("contract_id") != ANALYSIS_CONTRACT_ID:
         raise EvidenceGapError("Unexpected analysis request contract_id")
+    claim_text = str(request.get("claim_text") or "")
+    retrieval_query = str(request.get("retrieval_query") or claim_text)
+    if sha256_text(claim_text) != str(request.get("claim_text_sha256") or ""):
+        raise EvidenceGapError("Analysis canonical claim checksum mismatch")
+    if request.get("retrieval_query_sha256") is not None and sha256_text(
+        retrieval_query
+    ) != str(request.get("retrieval_query_sha256") or ""):
+        raise EvidenceGapError("Analysis retrieval query checksum mismatch")
 
     root = _find_repo_root(artifact_dir)
     request_meta = manifest.get("request", {})
@@ -406,7 +412,9 @@ def validate_analysis_artifact(artifact_dir: Path) -> dict[str, Any]:
     if manifest.get("pipeline") != expected_pipeline:
         raise EvidenceGapError("Unexpected analysis pipeline")
     if (artifact_dir / "evidence_retrieval").exists():
-        raise EvidenceGapError("Analysis artifact must not contain Phase 05 sentence retrieval")
+        raise EvidenceGapError(
+            "Analysis artifact must not contain Phase 05 sentence retrieval"
+        )
 
     stages = manifest.get("stages")
     if not isinstance(stages, dict) or set(stages) != set(_STAGE_DIRS):
@@ -433,6 +441,8 @@ def validate_analysis_artifact(artifact_dir: Path) -> dict[str, Any]:
         raise EvidenceGapError("Unexpected article retrieval contract_id")
     if article_manifest.get("claim_id") != request.get("claim_id"):
         raise EvidenceGapError("Article retrieval claim_id mismatch")
+    if article_manifest.get("retrieval_query", claim_text) != retrieval_query:
+        raise EvidenceGapError("Article retrieval query mismatch")
     top_article_rows = int(
         article_manifest.get("outputs", {}).get("top_articles", {}).get("rows", -1)
     )

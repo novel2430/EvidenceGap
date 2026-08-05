@@ -11,9 +11,7 @@ DEFAULT_CORPUS_DIR = Path("artifacts/v1/article_corpus")
 DEFAULT_ARTICLE_INPUT_DIR = Path("artifacts/v1/dense/article_inputs")
 DEFAULT_BM25_INDEX_DIR = Path("artifacts/v1/bm25_index")
 DEFAULT_MEDCPT_INDEX_DIR = Path("artifacts/v1/dense/medcpt/faiss_index")
-DEFAULT_BMRETRIEVER_INDEX_DIR = Path(
-    "artifacts/v1/dense/bmretriever/faiss_index"
-)
+DEFAULT_BMRETRIEVER_INDEX_DIR = Path("artifacts/v1/dense/bmretriever/faiss_index")
 DEFAULT_CROSS_ENCODER_MODEL_DIR = Path("models/v1/medcpt-cross")
 DEFAULT_STANZA_MODEL_DIR = Path("models/v1/stanza")
 ANALYSIS_CONTEXT_SCHEMA_VERSION = "1.0.0"
@@ -196,6 +194,34 @@ class PipelineConfig:
         return validate_analysis_context(context)
 
 
+@dataclass(frozen=True)
+class AgentConfig:
+    enabled: bool = True
+    max_steps: int = 20
+    total_search_budget: int = 8
+    per_claim_search_budget: int = 3
+    controller_retry_count: int = 2
+    checkpoint_enabled: bool = True
+
+    def __post_init__(self) -> None:
+        if self.max_steps <= 0 or self.total_search_budget < 0:
+            raise ValueError("Agent max_steps must be positive and budget non-negative")
+        if self.per_claim_search_budget <= 0 or self.controller_retry_count < 0:
+            raise ValueError(
+                "Agent per-claim budget must be positive and retries non-negative"
+            )
+
+    def safe_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "max_steps": self.max_steps,
+            "total_search_budget": self.total_search_budget,
+            "per_claim_search_budget": self.per_claim_search_budget,
+            "controller_retry_count": self.controller_retry_count,
+            "checkpoint_enabled": self.checkpoint_enabled,
+        }
+
+
 def _resolve(root: Path, value: Path | None, default: Path) -> Path:
     path = value if value is not None else default
     return path.resolve() if path.is_absolute() else (root / path).resolve()
@@ -245,6 +271,8 @@ class BackendConfig:
     inference_gap_llm: LLMStageConfig | None = None
     localization_llm: LLMStageConfig | None = None
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
+    agent_controller_llm: LLMStageConfig | None = None
+    agent: AgentConfig = field(default_factory=AgentConfig)
 
     def __post_init__(self) -> None:
         root = self.workspace_root.resolve()
@@ -358,6 +386,16 @@ class BackendConfig:
                     request_batch_size=self.translation_request_batch_size,
                 ),
             )
+        if self.agent_controller_llm is None:
+            object.__setattr__(
+                self,
+                "agent_controller_llm",
+                LLMStageConfig(
+                    **default_kwargs,
+                    max_tokens=1200,
+                    thinking=False,
+                ),
+            )
 
     @property
     def llm_stages(self) -> Mapping[str, LLMStageConfig]:
@@ -365,11 +403,13 @@ class BackendConfig:
         assert self.article_evidence_llm is not None
         assert self.inference_gap_llm is not None
         assert self.localization_llm is not None
+        assert self.agent_controller_llm is not None
         return {
             "statement_decomposition": self.decomposition_llm,
             "article_evidence": self.article_evidence_llm,
             "inference_gap": self.inference_gap_llm,
             "localization": self.localization_llm,
+            "agent_controller": self.agent_controller_llm,
         }
 
     @property
@@ -418,5 +458,6 @@ class BackendConfig:
                 }
             },
             "pipeline": self.pipeline.safe_dict(),
+            "agent": self.agent.safe_dict(),
             "output": {"default_language": self.default_language},
         }

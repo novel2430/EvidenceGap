@@ -11,6 +11,17 @@ evidencegap_backend.egg-info/SOURCES.txt
 evidencegap_backend.egg-info/dependency_links.txt
 evidencegap_backend.egg-info/requires.txt
 evidencegap_backend.egg-info/top_level.txt
+evidencegap_backend/agent/__init__.py
+evidencegap_backend/agent/controller.py
+evidencegap_backend/agent/demo_fake.py
+evidencegap_backend/agent/graph.py
+evidencegap_backend/agent/policies.py
+evidencegap_backend/agent/runner.py
+evidencegap_backend/agent/schemas.py
+evidencegap_backend/agent/studio.py
+evidencegap_backend/agent/tools.py
+evidencegap_backend/agent/tracing.py
+evidencegap_backend/agent/workspace.py
 evidencegap_backend/api/__init__.py
 evidencegap_backend/api/app.py
 evidencegap_backend/api/config.py
@@ -37,6 +48,7 @@ evidencegap_backend/pipeline/statement_bundle.py
 evidencegap_backend/pipeline/statement_decomposition.py
 evidencegap_backend/pipeline/statement_run.py
 evidencegap_backend/prompts/__init__.py
+evidencegap_backend/prompts/agent_controller.txt
 evidencegap_backend/prompts/article_evidence.txt
 evidencegap_backend/prompts/inference_gap.txt
 evidencegap_backend/prompts/localization.txt

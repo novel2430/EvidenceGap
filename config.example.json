@@ -50,6 +50,11 @@
           "version": "article-evidence-custom-v1"
         }
       },
+      "agent_controller": {
+        "model": "deepseek-v4-pro",
+        "max_tokens": 1200,
+        "thinking": false
+      },
       "inference_gap": {
         "model": "deepseek-v4-flash",
         "max_tokens": 8192,
@@ -70,6 +75,14 @@
         }
       }
     }
+  },
+  "agent": {
+    "enabled": true,
+    "max_steps": 20,
+    "total_search_budget": 8,
+    "per_claim_search_budget": 3,
+    "controller_retry_count": 2,
+    "checkpoint_enabled": true
   },
   "pipeline": {
     "retrieval": {
