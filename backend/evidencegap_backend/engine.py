@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass
-from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -26,7 +25,7 @@ from evidencegap_backend.pipeline.statement_run import (
     validate_statement_pipeline_artifact,
 )
 from evidencegap_backend.resources import RuntimeResources
-from evidencegap_backend.agent.runner import run_agent_statement_analysis
+from evidencegap_backend.agent.runner import run_agent_statement_pipeline
 
 
 @dataclass(frozen=True)
@@ -96,14 +95,16 @@ class EvidenceGapEngine:
                 raise EvidenceGapError("EvidenceGapEngine.load() must be called first")
             cfg = self.config
             with workspace_root_context(cfg.workspace_root):
-                pipeline_runner = run_statement_pipeline
+                pipeline_runner = (
+                    run_agent_statement_pipeline
+                    if cfg.agent.enabled
+                    else run_statement_pipeline
+                )
                 agent_kwargs = (
                     {
-                        "statement_analysis_runner": partial(
-                            run_agent_statement_analysis,
-                            agent_config=cfg.agent,
-                            controller_config=cfg.agent_controller_llm,
-                        )
+                        "agent_config": cfg.agent,
+                        "controller_config": cfg.agent_controller_llm,
+                        "gap_controller_config": cfg.agent_gap_controller_llm,
                     }
                     if cfg.agent.enabled
                     else {}

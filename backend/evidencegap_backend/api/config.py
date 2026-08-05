@@ -27,6 +27,7 @@ _STAGE_ENV_PREFIXES = {
     "inference_gap": "INFERENCE_GAP",
     "localization": "LOCALIZATION",
     "agent_controller": "AGENT_CONTROLLER",
+    "agent_gap_controller": "AGENT_GAP_CONTROLLER",
 }
 
 
@@ -538,6 +539,19 @@ def backend_config_from_env(
         default_max_retries=default_retries,
         default_thinking=False,
     )
+    agent_gap_controller = _stage_llm_config(
+        document=doc,
+        stage_name="agent_gap_controller",
+        environ=env,
+        default_provider=default_provider,
+        default_model=default_model,
+        default_api_key_env=default_api_key_env,
+        default_base_url=default_base_url,
+        default_max_tokens=1200,
+        default_timeout_seconds=default_timeout,
+        default_max_retries=default_retries,
+        default_thinking=False,
+    )
 
     pipeline = PipelineConfig(
         source_depth=_int(
@@ -595,6 +609,21 @@ def backend_config_from_env(
             env,
             "EVIDENCEGAP_AGENT_CONTROLLER_RETRY_COUNT",
             int(agent_data.get("controller_retry_count", 2)),
+        ),
+        max_gap_rounds=_int(
+            env,
+            "EVIDENCEGAP_AGENT_MAX_GAP_ROUNDS",
+            int(agent_data.get("max_gap_rounds", 2)),
+        ),
+        gap_remediation_budget=_int(
+            env,
+            "EVIDENCEGAP_AGENT_GAP_REMEDIATION_BUDGET",
+            int(agent_data.get("gap_remediation_budget", 2)),
+        ),
+        gap_controller_retry_count=_int(
+            env,
+            "EVIDENCEGAP_AGENT_GAP_CONTROLLER_RETRY_COUNT",
+            int(agent_data.get("gap_controller_retry_count", 2)),
         ),
         checkpoint_enabled=_bool(
             env,
@@ -686,6 +715,7 @@ def backend_config_from_env(
         inference_gap_llm=inference_gap,
         localization_llm=localization,
         agent_controller_llm=agent_controller,
+        agent_gap_controller_llm=agent_gap_controller,
         pipeline=pipeline,
         agent=agent,
     )

@@ -48,6 +48,8 @@ Labels:
 - refute: the article reports direct evidence that increases confidence that the exact claim is false or materially contradicts it.
 - insufficient: the article is related but does not provide enough directly applicable evidence for either direction, or its findings are mixed or ambiguous for the exact claim.
 
+Check claim applicability before assigning a stance.
+
 Applicability rules:
 - Before assigning support or refute, verify that the article matches the claim in population or species, intervention or exposure, comparator, outcome, direction, timeframe, estimand, and scope.
 - Semantic relatedness is not claim applicability.

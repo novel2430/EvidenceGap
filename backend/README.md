@@ -13,11 +13,22 @@ evidence Judge, deterministic claim aggregation, and final evidence graph. A
 controller query affects retrieval and reranking only; the canonical claim still
 defines the Claim ID, Judge hypothesis, aggregation, and downstream bundle.
 
-LangGraph owns explicit state, conditional routing, the Controller → Tool →
-Workspace loop, and SQLite checkpointing. Ordinary code validates every action,
-enforces total/per-claim budgets and duplicate-query guards, selects a real
-successful attempt, and supplies deterministic fallback decisions. The
-Controller never creates the formal medical verdict.
+LangGraph now executes the complete statement run: decomposition, evidence
+acquisition, statement-analysis materialization, Statement Bundle, formal
+Inference Gap Analysis, gap review, optional targeted remediation, presentation
+output, and run finalization. Statement Bundle is the deterministic bridge from
+the claim-level Evidence Controller to the Gap Controller. If a coverage gap can
+reasonably be improved by another article search, the Gap Controller reopens an
+existing claim and supplies one validated retrieval query. The graph then
+reselects an attempt and rebuilds Analysis, Bundle, and Gap artifacts. Pure logic
+gaps (for example association-to-causation or population/quantifier leaps) are
+accepted and preserved rather than hidden by repeated searches.
+
+The Gap Controller has three actions: `REQUEST_MORE_EVIDENCE`, `ACCEPT_GAPS`,
+and `ABSTAIN`. It cannot edit the formal gap result, just as the Evidence
+Controller cannot create a medical verdict. Ordinary code validates both
+controllers, enforces search/remediation/round budgets and duplicate-query
+guards, and supplies bounded deterministic fallbacks.
 
 Each successful run adds these auditable files under `<run>/agent/`:
 
@@ -27,10 +38,20 @@ action_trace.jsonl
 agent_manifest.json
 execution_graph.mmd
 checkpoints.sqlite
+gap_rounds/round_001.json
+gap_rounds/round_002.json
+gap_rounds/round_001_gap_summary.json
+gap_rounds/round_002_gap_summary.json
 ```
 
-Run the network/GPU-free smoke test (it executes the real compiled graph with a
-fake controller and fake search implementation):
+Each round record retains the selected attempts and hashes of the canonical
+stage artifacts. Its paired immutable compact summary preserves the actual gap
+IDs, types, supported basis, unsupported extension, reason, and closure
+requirement even after the canonical Bundle and Gap directories are rebuilt.
+
+Run the network/GPU-free smoke test (it executes the real compiled graph with
+fake controllers, fake search, and fake deterministic stage executors). Every
+node writes a corresponding fake artifact; the node history is not hand-built:
 
 ```bash
 source .venv/bin/activate
@@ -52,6 +73,9 @@ EVIDENCEGAP_AGENT_MAX_STEPS
 EVIDENCEGAP_AGENT_TOTAL_SEARCH_BUDGET
 EVIDENCEGAP_AGENT_PER_CLAIM_SEARCH_BUDGET
 EVIDENCEGAP_AGENT_CONTROLLER_RETRY_COUNT
+EVIDENCEGAP_AGENT_MAX_GAP_ROUNDS
+EVIDENCEGAP_AGENT_GAP_REMEDIATION_BUDGET
+EVIDENCEGAP_AGENT_GAP_CONTROLLER_RETRY_COUNT
 EVIDENCEGAP_AGENT_CHECKPOINT_ENABLED
 EVIDENCEGAP_AGENT_CONTROLLER_PROVIDER
 EVIDENCEGAP_AGENT_CONTROLLER_MODEL
@@ -59,9 +83,16 @@ EVIDENCEGAP_AGENT_CONTROLLER_API_KEY_ENV
 EVIDENCEGAP_AGENT_CONTROLLER_BASE_URL
 EVIDENCEGAP_AGENT_CONTROLLER_MAX_TOKENS
 EVIDENCEGAP_AGENT_CONTROLLER_THINKING
+EVIDENCEGAP_AGENT_GAP_CONTROLLER_PROVIDER
+EVIDENCEGAP_AGENT_GAP_CONTROLLER_MODEL
+EVIDENCEGAP_AGENT_GAP_CONTROLLER_API_KEY_ENV
+EVIDENCEGAP_AGENT_GAP_CONTROLLER_BASE_URL
+EVIDENCEGAP_AGENT_GAP_CONTROLLER_MAX_TOKENS
+EVIDENCEGAP_AGENT_GAP_CONTROLLER_THINKING
 ```
 
-Studio is a development/trace surface only; FastAPI remains the production
+Studio imports the same complete graph topology with a resource-free demo
+context. It is a development/trace surface only; FastAPI remains the production
 entry point and no second business pipeline or server contract is introduced.
 
 `backend/` is the independent online implementation of the current EvidenceGap
@@ -254,6 +285,7 @@ article_evidence
 inference_gap
 localization
 agent_controller
+agent_gap_controller
 ```
 
 Global environment variables such as `EVIDENCEGAP_MODEL` override all JSON

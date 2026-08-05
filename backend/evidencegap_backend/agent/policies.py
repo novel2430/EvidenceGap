@@ -5,7 +5,11 @@ from evidencegap_backend.agent.schemas import (
     AgentDecision,
     EvidenceWorkspace,
 )
-from evidencegap_backend.agent.workspace import normalize_query, successful_attempts
+from evidencegap_backend.agent.workspace import (
+    choose_attempt,
+    normalize_query,
+    successful_attempts,
+)
 
 
 class InvalidDecision(ValueError):
@@ -34,12 +38,17 @@ def validate_decision(
             raise InvalidDecision("SEARCH query is blank")
         if normalized in claim.normalized_queries:
             raise InvalidDecision("SEARCH query duplicates a previous query")
-    else:
+    elif decision.action is AgentAction.RESOLVE:
         attempts = successful_attempts(claim)
         if not attempts:
-            raise InvalidDecision(f"{decision.action} requires a successful attempt")
+            raise InvalidDecision("RESOLVE requires a successful attempt")
         if decision.selected_attempt_id and decision.selected_attempt_id not in {
             a.attempt_id for a in attempts
+        }:
+            raise InvalidDecision("selected_attempt_id is not a successful attempt")
+    elif decision.selected_attempt_id:
+        if decision.selected_attempt_id not in {
+            attempt.attempt_id for attempt in successful_attempts(claim)
         }:
             raise InvalidDecision("selected_attempt_id is not a successful attempt")
     return decision
@@ -67,19 +76,16 @@ def deterministic_fallback(
         if workspace.claims[cid].status == "pending"
     ]
     if not pending:
-        return AgentDecision(action="FINISH", reason=reason)
-    for claim in pending:
-        if (
-            not successful_attempts(claim)
-            and workspace.remaining_search_budget > 0
-            and len(claim.attempts) < workspace.per_claim_search_budget
-        ):
-            query = _unused_query(workspace, claim.claim_id)
-            if query:
-                return AgentDecision(
-                    action="SEARCH", claim_id=claim.claim_id, query=query, reason=reason
-                )
+        return AgentDecision(action="FINISH", reason="All claims are terminal.")
     claim = pending[0]
+    attempts = successful_attempts(claim)
+    if attempts:
+        return AgentDecision(
+            action=AgentAction.RESOLVE,
+            claim_id=claim.claim_id,
+            selected_attempt_id=choose_attempt(claim).attempt_id,
+            reason="Select the best successful attempt deterministically.",
+        )
     if (
         workspace.remaining_search_budget > 0
         and len(claim.attempts) < workspace.per_claim_search_budget
@@ -89,7 +95,9 @@ def deterministic_fallback(
             return AgentDecision(
                 action="SEARCH", claim_id=claim.claim_id, query=query, reason=reason
             )
-    if successful_attempts(claim):
-        return AgentDecision(action="ABSTAIN", claim_id=claim.claim_id, reason=reason)
-    # Internal convergence action: graph marks a searchless claim failed.
-    return AgentDecision(action="ABSTAIN", claim_id=claim.claim_id, reason=reason)
+    return AgentDecision(
+        action=AgentAction.ABSTAIN,
+        claim_id=claim.claim_id,
+        remaining_problem="No successful attempt is available.",
+        reason="No successful attempt is available and further search cannot proceed.",
+    )

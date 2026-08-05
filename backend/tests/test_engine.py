@@ -78,14 +78,17 @@ def test_engine_reuses_loaded_resources_and_returns_bundle(
         assert kwargs["stage_configs"] == config.llm_stages
         assert kwargs["pipeline_config"] == config.pipeline
         assert kwargs["resolved_config_snapshot"] == config.safe_dict()
-        assert callable(kwargs["statement_analysis_runner"])
+        assert kwargs["agent_config"] == config.agent
+        assert kwargs["controller_config"] == config.agent_controller_llm
+        assert kwargs["gap_controller_config"] == config.agent_gap_controller_llm
+        assert "statement_analysis_runner" not in kwargs
         return {
             "artifact_dir": str(artifact_dir.relative_to(tmp_path)),
             "presentation_bundle_path": str(presentation_path.relative_to(tmp_path)),
             "presentation_bundle": {"contract_id": "phase077.presentation-bundle.v1"},
         }
 
-    monkeypatch.setattr("evidencegap_backend.engine.run_statement_pipeline", fake_run)
+    monkeypatch.setattr("evidencegap_backend.engine.run_agent_statement_pipeline", fake_run)
     monkeypatch.setattr(
         "evidencegap_backend.engine.validate_statement_pipeline_artifact",
         lambda path: {"status": "PASS"},
@@ -173,7 +176,7 @@ def test_engine_uses_configured_default_language(
             "presentation_bundle": {},
         }
 
-    monkeypatch.setattr("evidencegap_backend.engine.run_statement_pipeline", fake_run)
+    monkeypatch.setattr("evidencegap_backend.engine.run_agent_statement_pipeline", fake_run)
     monkeypatch.setattr(
         "evidencegap_backend.engine.validate_statement_pipeline_artifact",
         lambda path: {"status": "PASS"},

@@ -102,17 +102,26 @@ def test_agent_config_and_controller_stage_environment(tmp_path: Path) -> None:
             "EVIDENCEGAP_AGENT_MAX_STEPS": "9",
             "EVIDENCEGAP_AGENT_TOTAL_SEARCH_BUDGET": "4",
             "EVIDENCEGAP_AGENT_PER_CLAIM_SEARCH_BUDGET": "2",
+            "EVIDENCEGAP_AGENT_MAX_GAP_ROUNDS": "3",
+            "EVIDENCEGAP_AGENT_GAP_REMEDIATION_BUDGET": "1",
+            "EVIDENCEGAP_AGENT_GAP_CONTROLLER_RETRY_COUNT": "4",
             "EVIDENCEGAP_AGENT_CHECKPOINT_ENABLED": "false",
             "EVIDENCEGAP_AGENT_CONTROLLER_MODEL": "deepseek-v4-pro",
+            "EVIDENCEGAP_AGENT_GAP_CONTROLLER_MODEL": "deepseek-v4-gap",
         }
     )
     assert not config.agent.enabled
     assert config.agent.max_steps == 9
     assert config.agent.total_search_budget == 4
     assert config.agent.per_claim_search_budget == 2
+    assert config.agent.max_gap_rounds == 3
+    assert config.agent.gap_remediation_budget == 1
+    assert config.agent.gap_controller_retry_count == 4
     assert not config.agent.checkpoint_enabled
     assert config.agent_controller_llm is not None
     assert config.agent_controller_llm.model == "deepseek-v4-pro"
+    assert config.agent_gap_controller_llm is not None
+    assert config.agent_gap_controller_llm.model == "deepseek-v4-gap"
     assert "agent" in config.safe_dict()
 
 

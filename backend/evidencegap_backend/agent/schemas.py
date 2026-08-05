@@ -13,6 +13,40 @@ class AgentAction(StrEnum):
     FINISH = "FINISH"
 
 
+class GapAction(StrEnum):
+    REQUEST_MORE_EVIDENCE = "REQUEST_MORE_EVIDENCE"
+    ACCEPT_GAPS = "ACCEPT_GAPS"
+    ABSTAIN = "ABSTAIN"
+
+
+class GapDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: GapAction
+    target_gap_id: str | None = None
+    claim_id: str | None = None
+    query: str | None = None
+    remaining_problem: str | None = None
+    reason: str = Field(min_length=1, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_action_fields(self) -> "GapDecision":
+        if self.action is GapAction.REQUEST_MORE_EVIDENCE:
+            if not all(
+                (self.target_gap_id, self.claim_id, (self.query or "").strip())
+            ):
+                raise ValueError(
+                    "REQUEST_MORE_EVIDENCE requires target_gap_id, claim_id, and query"
+                )
+        elif any(
+            (self.target_gap_id, self.claim_id, self.query, self.remaining_problem)
+        ):
+            raise ValueError(
+                f"{self.action} does not accept gap, claim, query, or remaining problem fields"
+            )
+        return self
+
+
 class AgentDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -94,6 +128,8 @@ class ClaimWorkspace(BaseModel):
     remaining_problem: str | None = None
     terminal_reason: str | None = None
     last_error: str | None = None
+    reopen_count: int = 0
+    reopened_for_gap_id: str | None = None
 
 
 class EvidenceWorkspace(BaseModel):
@@ -108,6 +144,8 @@ class EvidenceWorkspace(BaseModel):
     active_claim_id: str | None = None
     decision: AgentDecision | None = None
     decision_source: str | None = None
+    gap_decision: GapDecision | None = None
+    gap_decision_source: str | None = None
     last_action_result: dict[str, Any] | None = None
     step_count: int = 0
     max_steps: int = 20
@@ -118,7 +156,30 @@ class EvidenceWorkspace(BaseModel):
         default_factory=lambda: {action.value: 0 for action in AgentAction}
     )
     rejected_decisions: int = 0
-    status: Literal["running", "finished"] = "running"
+    rejected_gap_decisions: int = 0
+    evidence_controller_decision_count: int = 0
+    gap_controller_decision_count: int = 0
+    deterministic_fallback_decisions: int = 0
+    phase: Literal[
+        "evidence",
+        "materializing",
+        "bundle",
+        "gap_analysis",
+        "gap_decision",
+        "output",
+        "finished",
+        "failed",
+    ] = "evidence"
+    evidence_cycle: int = 1
+    gap_round: int = 0
+    gap_remediation_count: int = 0
+    max_gap_rounds: int = 2
+    initial_gap_remediation_budget: int = 2
+    remaining_gap_remediation_budget: int = 2
+    gap_history: list[dict[str, Any]] = Field(default_factory=list)
+    latest_gap_summary: dict[str, Any] | None = None
+    final_output_path: str | None = None
+    status: Literal["running", "finished", "failed"] = "running"
     finish_reason: str | None = None
     started_at: str
     finished_at: str | None = None

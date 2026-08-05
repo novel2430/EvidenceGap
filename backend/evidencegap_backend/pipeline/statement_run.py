@@ -320,7 +320,9 @@ def run_statement_pipeline(
     }
     llm_stages = dict(legacy_stage_configs)
     if stage_configs is not None:
-        unknown = set(stage_configs) - (set(llm_stages) | {"agent_controller"})
+        unknown = set(stage_configs) - (
+            set(llm_stages) | {"agent_controller", "agent_gap_controller"}
+        )
         if unknown:
             raise EvidenceGapError(
                 f"Unknown LLM stage configuration: {sorted(unknown)}"

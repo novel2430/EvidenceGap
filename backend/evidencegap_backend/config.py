@@ -201,6 +201,9 @@ class AgentConfig:
     total_search_budget: int = 8
     per_claim_search_budget: int = 3
     controller_retry_count: int = 2
+    max_gap_rounds: int = 2
+    gap_remediation_budget: int = 2
+    gap_controller_retry_count: int = 2
     checkpoint_enabled: bool = True
 
     def __post_init__(self) -> None:
@@ -210,6 +213,12 @@ class AgentConfig:
             raise ValueError(
                 "Agent per-claim budget must be positive and retries non-negative"
             )
+        if self.max_gap_rounds <= 0 or self.gap_remediation_budget < 0:
+            raise ValueError(
+                "Agent max_gap_rounds must be positive and remediation budget non-negative"
+            )
+        if self.gap_controller_retry_count < 0:
+            raise ValueError("Agent gap controller retries cannot be negative")
 
     def safe_dict(self) -> dict[str, Any]:
         return {
@@ -218,6 +227,9 @@ class AgentConfig:
             "total_search_budget": self.total_search_budget,
             "per_claim_search_budget": self.per_claim_search_budget,
             "controller_retry_count": self.controller_retry_count,
+            "max_gap_rounds": self.max_gap_rounds,
+            "gap_remediation_budget": self.gap_remediation_budget,
+            "gap_controller_retry_count": self.gap_controller_retry_count,
             "checkpoint_enabled": self.checkpoint_enabled,
         }
 
@@ -272,6 +284,7 @@ class BackendConfig:
     localization_llm: LLMStageConfig | None = None
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
     agent_controller_llm: LLMStageConfig | None = None
+    agent_gap_controller_llm: LLMStageConfig | None = None
     agent: AgentConfig = field(default_factory=AgentConfig)
 
     def __post_init__(self) -> None:
@@ -396,6 +409,16 @@ class BackendConfig:
                     thinking=False,
                 ),
             )
+        if self.agent_gap_controller_llm is None:
+            object.__setattr__(
+                self,
+                "agent_gap_controller_llm",
+                LLMStageConfig(
+                    **default_kwargs,
+                    max_tokens=1200,
+                    thinking=False,
+                ),
+            )
 
     @property
     def llm_stages(self) -> Mapping[str, LLMStageConfig]:
@@ -404,12 +427,14 @@ class BackendConfig:
         assert self.inference_gap_llm is not None
         assert self.localization_llm is not None
         assert self.agent_controller_llm is not None
+        assert self.agent_gap_controller_llm is not None
         return {
             "statement_decomposition": self.decomposition_llm,
             "article_evidence": self.article_evidence_llm,
             "inference_gap": self.inference_gap_llm,
             "localization": self.localization_llm,
             "agent_controller": self.agent_controller_llm,
+            "agent_gap_controller": self.agent_gap_controller_llm,
         }
 
     @property

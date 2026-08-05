@@ -55,6 +55,11 @@
         "max_tokens": 1200,
         "thinking": false
       },
+      "agent_gap_controller": {
+        "model": "deepseek-v4-pro",
+        "max_tokens": 1200,
+        "thinking": false
+      },
       "inference_gap": {
         "model": "deepseek-v4-flash",
         "max_tokens": 8192,
@@ -82,6 +87,9 @@
     "total_search_budget": 8,
     "per_claim_search_budget": 3,
     "controller_retry_count": 2,
+    "max_gap_rounds": 2,
+    "gap_remediation_budget": 2,
+    "gap_controller_retry_count": 2,
     "checkpoint_enabled": true
   },
   "pipeline": {

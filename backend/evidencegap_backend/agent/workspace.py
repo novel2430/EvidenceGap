@@ -30,6 +30,8 @@ def initialize_workspace(
     max_steps: int,
     total_search_budget: int,
     per_claim_search_budget: int,
+    max_gap_rounds: int = 2,
+    gap_remediation_budget: int = 2,
 ) -> EvidenceWorkspace:
     claims: dict[str, ClaimWorkspace] = {}
     order: list[str] = []
@@ -53,6 +55,9 @@ def initialize_workspace(
         initial_search_budget=total_search_budget,
         remaining_search_budget=total_search_budget,
         per_claim_search_budget=per_claim_search_budget,
+        max_gap_rounds=max_gap_rounds,
+        initial_gap_remediation_budget=gap_remediation_budget,
+        remaining_gap_remediation_budget=gap_remediation_budget,
         started_at=utc_now(),
     )
 
@@ -138,6 +143,8 @@ def compact_summary(workspace: EvidenceWorkspace) -> dict[str, Any]:
         "step_count": workspace.step_count,
         "max_steps": workspace.max_steps,
         "remaining_search_budget": workspace.remaining_search_budget,
+        "evidence_cycle": workspace.evidence_cycle,
+        "gap_round": workspace.gap_round,
     }
 
 

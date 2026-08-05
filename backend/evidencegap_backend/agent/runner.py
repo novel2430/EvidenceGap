@@ -1,342 +1,244 @@
 from __future__ import annotations
 
-import re
 import sqlite3
-import time
-from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from evidencegap_backend.agent.controller import EvidenceController
+from evidencegap_backend.agent.gap_controller import GapController
 from evidencegap_backend.agent.graph import build_agent_graph
-from evidencegap_backend.agent.schemas import EvidenceWorkspace
-from evidencegap_backend.agent.tools import (
-    create_analysis_executor,
-    create_search_evidence_tool,
-)
+from evidencegap_backend.agent.stages import AgentRuntimeContext, ProductionStageExecutor
+from evidencegap_backend.agent.tools import create_analysis_executor, create_search_evidence_tool
 from evidencegap_backend.agent.tracing import AgentTraceWriter
-from evidencegap_backend.agent.workspace import initialize_workspace
-from evidencegap_backend.common import (
-    EvidenceGapError,
-    atomic_write_json,
-    load_json,
-    relative_path,
-    require_empty_or_force,
-    sha256_file,
-)
+from evidencegap_backend.common import EvidenceGapError, require_empty_or_force
 from evidencegap_backend.config import AgentConfig, LLMStageConfig, PipelineConfig
-from evidencegap_backend.pipeline.statement_analysis import (
-    STATEMENT_ANALYSIS_CONTRACT_ID,
-    STATEMENT_ANALYSIS_SCHEMA_VERSION,
-    validate_statement_analysis_artifact,
-    validate_statement_analysis_bundle,
-)
-from evidencegap_backend.pipeline.statement_decomposition import (
-    validate_decomposition_bundle,
-    validate_statement_decomposition_artifact,
-)
-from evidencegap_backend.pipeline.statement_run import run_statement_pipeline
+from evidencegap_backend.pipeline.statement_run import DEFAULT_ARTIFACT_ROOT, _safe_name
 
-
-def _safe(value: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip()).strip("._-")
-    if not cleaned:
-        raise EvidenceGapError("run_name cannot be empty")
-    return cleaned
-
-
-def _resolve(root: Path, value: str | Path) -> Path:
-    path = Path(value)
-    return path.resolve() if path.is_absolute() else (root / path).resolve()
-
-
-def run_agent_statement_analysis(
-    root: Path,
-    *,
-    decomposition_artifact_dir: Path,
-    run_name: str,
-    provider: str,
-    model: str | None = None,
-    artifact_root: Path | None = None,
-    decomposition_bundle: Mapping[str, Any] | None = None,
-    progress_callback: Callable[..., None] | None = None,
-    force: bool = False,
-    controller_config: LLMStageConfig,
-    agent_config: AgentConfig,
-    **analysis_kwargs: Any,
-) -> dict[str, Any]:
-    root = root.resolve()
-    started = time.perf_counter()
-    decomposition_dir = _resolve(root, decomposition_artifact_dir)
-    validate_statement_decomposition_artifact(decomposition_dir)
-    decomposition = (
-        dict(decomposition_bundle)
-        if decomposition_bundle is not None
-        else load_json(decomposition_dir / "decomposition.json")
-    )
-    decomposition_validation = validate_decomposition_bundle(decomposition)
-    name = _safe(run_name)
-    base = artifact_root.resolve() if artifact_root else root
-    target = base / name
-    require_empty_or_force(target, force=force)
-    target.mkdir(parents=True, exist_ok=False)
-    attempts_root = target / "agent_attempts"
-    agent_dir = base / "agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    trace = AgentTraceWriter(agent_dir)
-    workspace = initialize_workspace(
-        run_name=name,
-        statement=str(decomposition["original_statement"]),
-        language=str(decomposition["source_language"]),
-        decomposition=decomposition,
-        max_steps=agent_config.max_steps,
-        total_search_budget=agent_config.total_search_budget,
-        per_claim_search_budget=agent_config.per_claim_search_budget,
-    )
-    pipeline_settings = analysis_kwargs.get("pipeline_config") or PipelineConfig()
-    executor_kwargs = dict(analysis_kwargs)
-    executor_kwargs.pop("decomposition_bundle", None)
-    executor_kwargs.pop("progress_callback", None)
-    executor_kwargs.pop("force", None)
-    executor_kwargs.update({"provider": provider, "model": model})
-    tool = create_search_evidence_tool(
-        create_analysis_executor(
-            root=root, analysis_kwargs=executor_kwargs, attempts_root=attempts_root
-        )
-    )
-    controller = EvidenceController(controller_config)
-
-    def progress_finalize(ws: EvidenceWorkspace) -> None:
-        if progress_callback:
-            progress_callback(
-                sum(c.status != "pending" for c in ws.claims.values()), len(ws.claims)
-            )
-
-    def action_progress(ws: EvidenceWorkspace, decision: Any) -> None:
-        if not progress_callback:
-            return
-        completed = sum(c.status != "pending" for c in ws.claims.values())
-        claim_label = decision.claim_id or "all claims"
-        detail = f" with query: {decision.query}" if decision.query else ""
-        progress_callback(
-            completed,
-            len(ws.claims),
-            f"Agent step {ws.step_count + 1}: {decision.action.value.lower()} {claim_label}{detail}",
-        )
-
-    checkpoint_path = agent_dir / "checkpoints.sqlite"
-    connection: sqlite3.Connection | None = None
-    try:
-        checkpointer = None
-        if agent_config.checkpoint_enabled:
-            connection = sqlite3.connect(checkpoint_path, check_same_thread=False)
-            checkpointer = SqliteSaver(connection)
-        graph = build_agent_graph(
-            controller=controller,
-            search_tool=tool,
-            controller_retry_count=agent_config.controller_retry_count,
-            trace_writer=trace,
-            checkpointer=checkpointer,
-            finalize=progress_finalize,
-            action_callback=action_progress,
-        )
-        (agent_dir / "execution_graph.mmd").write_text(
-            graph.get_graph().draw_mermaid(), encoding="utf-8"
-        )
-        final_state = graph.invoke(
-            {"workspace": workspace.model_dump(mode="json"), "node_history": []},
-            config={
-                "configurable": {"thread_id": name},
-                "recursion_limit": max(50, agent_config.max_steps * 4 + 20),
-            },
-        )
-    finally:
-        if connection is not None:
-            connection.close()
-    final_workspace = EvidenceWorkspace.model_validate(final_state["workspace"])
-    trace.write_workspace(final_workspace.model_dump(mode="json"))
-
-    claim_results: list[dict[str, Any]] = []
-    graph_bundles: dict[str, dict[str, Any]] = {}
-    for claim_id in final_workspace.claim_order:
-        claim = final_workspace.claims[claim_id]
-        selected = next(
-            (
-                a
-                for a in claim.attempts
-                if a.attempt_id == claim.selected_attempt_id
-                and a.status == "successful"
-            ),
-            None,
-        )
-        if selected is None:
-            claim_results.append(
-                {
-                    "claim_id": claim_id,
-                    "source_text": claim.source_text,
-                    "source_spans": claim.source_spans,
-                    "canonical_claim_en": claim.canonical_claim_en,
-                    "status": "failed",
-                    "phase07_artifact_dir": None,
-                    "graph_bundle_path": None,
-                    "verdict": None,
-                    "error": claim.last_error
-                    or claim.terminal_reason
-                    or "No successful evidence attempt",
-                    "agent_status": claim.status,
-                }
-            )
-        else:
-            graph_path = _resolve(root, str(selected.graph_bundle_path))
-            graph_bundles[claim_id] = load_json(graph_path)
-            claim_results.append(
-                {
-                    "claim_id": claim_id,
-                    "source_text": claim.source_text,
-                    "source_spans": claim.source_spans,
-                    "canonical_claim_en": claim.canonical_claim_en,
-                    "status": "completed",
-                    "phase07_artifact_dir": selected.artifact_dir,
-                    "graph_bundle_path": selected.graph_bundle_path,
-                    "verdict": selected.verdict,
-                    "error": None,
-                    "agent_status": claim.status,
-                    "selected_attempt_id": selected.attempt_id,
-                }
-            )
-    completed = sum(x["status"] == "completed" for x in claim_results)
-    failed = len(claim_results) - completed
-    analysis_status = (
-        "completed"
-        if not failed
-        else ("failed" if not completed else "partial_failure")
-    )
-    bundle = {
-        "schema_version": STATEMENT_ANALYSIS_SCHEMA_VERSION,
-        "contract_id": STATEMENT_ANALYSIS_CONTRACT_ID,
-        "statement_id": decomposition_validation["statement_id"],
-        "original_statement": decomposition["original_statement"],
-        "source_language": decomposition["source_language"],
-        "analysis_status": analysis_status,
-        "analysis_context": pipeline_settings.analysis_context(),
-        "claim_results": claim_results,
-        "summary": {
-            "total_claims": len(claim_results),
-            "completed_claims": completed,
-            "failed_claims": failed,
-        },
-    }
-    validate_statement_analysis_bundle(bundle)
-    result_path = target / "statement_result.json"
-    atomic_write_json(result_path, bundle)
-    decomposition_path = decomposition_dir / "decomposition.json"
-    request = {
-        "schema_version": STATEMENT_ANALYSIS_SCHEMA_VERSION,
-        "contract_id": STATEMENT_ANALYSIS_CONTRACT_ID,
-        "run_name": name,
-        "decomposition_artifact_dir": relative_path(root, decomposition_dir),
-        "decomposition_path": relative_path(root, decomposition_path),
-        "decomposition_sha256": sha256_file(decomposition_path),
-    }
-    atomic_write_json(target / "request.json", request)
-    manifest = {
-        "schema_version": STATEMENT_ANALYSIS_SCHEMA_VERSION,
-        "contract_id": STATEMENT_ANALYSIS_CONTRACT_ID,
-        "run_type": "langgraph_agent_multi_claim_analysis",
-        "run_name": name,
-        "statement_id": decomposition_validation["statement_id"],
-        "analysis_status": analysis_status,
-        "execution": {
-            "provider": provider,
-            "model": model,
-            "orchestration": "langgraph",
-            "decomposition_handoff": "in_memory_handoff"
-            if decomposition_bundle
-            else "artifact_reload",
-        },
-        "counts": dict(bundle["summary"]),
-        "source": {
-            "decomposition_artifact_dir": relative_path(root, decomposition_dir),
-            "decomposition": {
-                "path": relative_path(root, decomposition_path),
-                "sha256": sha256_file(decomposition_path),
-            },
-        },
-        "outputs": {
-            "statement_result": {
-                "path": relative_path(root, result_path),
-                "sha256": sha256_file(result_path),
-            }
-        },
-        "seconds": round(time.perf_counter() - started, 6),
-    }
-    atomic_write_json(target / "run_manifest.json", manifest)
-    validate_statement_analysis_artifact(target)
-    agent_manifest = {
-        "schema_version": "1.0.0",
-        "contract_id": "evidencegap.agent-harness.v1",
-        "run_name": name,
-        "execution_mode": "langgraph_agent",
-        "langgraph_enabled": True,
-        "checkpoint_backend": "sqlite"
-        if agent_config.checkpoint_enabled
-        else "disabled",
-        "checkpoint_path": str(checkpoint_path)
-        if agent_config.checkpoint_enabled
-        else None,
-        "controller": {
-            "provider": controller_config.provider,
-            "model": controller_config.model,
-        },
-        "max_steps": agent_config.max_steps,
-        "initial_search_budget": final_workspace.initial_search_budget,
-        "remaining_search_budget": final_workspace.remaining_search_budget,
-        "action_counts": final_workspace.action_counts,
-        "search_attempt_count": sum(
-            len(c.attempts) for c in final_workspace.claims.values()
-        ),
-        "resolved_claims": sum(
-            c.status == "resolved" for c in final_workspace.claims.values()
-        ),
-        "abstained_claims": sum(
-            c.status == "abstained" for c in final_workspace.claims.values()
-        ),
-        "failed_claims": sum(
-            c.status == "failed" for c in final_workspace.claims.values()
-        ),
-        "artifacts": {
-            "workspace": str(agent_dir / "workspace.json"),
-            "action_trace": str(trace.path),
-            "execution_graph": str(agent_dir / "execution_graph.mmd"),
-        },
-        "total_seconds": round(time.perf_counter() - started, 6),
-    }
-    atomic_write_json(agent_dir / "agent_manifest.json", agent_manifest)
-    return {
-        **validate_statement_analysis_bundle(bundle),
-        "status": analysis_status.upper(),
-        "artifact_status": "PASS",
-        "run_name": name,
-        "artifact_dir": relative_path(root, target),
-        "statement_result_path": relative_path(root, result_path),
-        "statement_result": bundle,
-        "decomposition": decomposition,
-        "claim_graph_bundles": graph_bundles,
-    }
+if TYPE_CHECKING:
+    from evidencegap_backend.resources import RuntimeResources
 
 
 def run_agent_statement_pipeline(
     root: Path,
     *,
+    statement: str,
+    run_name: str,
+    provider: str,
     agent_config: AgentConfig,
     controller_config: LLMStageConfig,
-    **kwargs: Any,
+    gap_controller_config: LLMStageConfig,
+    model: str | None = None,
+    device: str = "cuda:0",
+    amp: str = "fp16",
+    artifact_root: Path | None = None,
+    corpus_dir: Path | None = None,
+    article_input_dir: Path | None = None,
+    bm25_index_dir: Path | None = None,
+    medcpt_index_dir: Path | None = None,
+    bmretriever_index_dir: Path | None = None,
+    cross_encoder_model_dir: Path | None = None,
+    stanza_model_dir: Path | None = None,
+    stanza_package: str = "genia",
+    stanza_batch_size: int = 32,
+    cross_encoder_batch_size: int = 16,
+    section_mode: str = "auto",
+    allow_cpu_fallback: bool = False,
+    api_key_env: str | None = None,
+    base_url: str | None = None,
+    decomposition_max_tokens: int = 2048,
+    request_batch_size: int = 2,
+    max_tokens: int = 4096,
+    gap_max_tokens: int = 4096,
+    language: str = "English",
+    translation_max_tokens: int = 8192,
+    translation_request_batch_size: int = 32,
+    timeout_seconds: float = 180.0,
+    max_retries: int = 4,
+    decomposition_thinking: bool = False,
+    analysis_thinking: bool | None = None,
+    gap_thinking: bool | None = None,
+    cache_dir: Path | None = None,
+    runtime_resources: "RuntimeResources | None" = None,
+    stage_configs: Mapping[str, LLMStageConfig] | None = None,
+    pipeline_config: PipelineConfig | None = None,
+    resolved_config_snapshot: Mapping[str, Any] | None = None,
+    progress_callback: Any = None,
+    force: bool = False,
 ) -> dict[str, Any]:
-    runner = partial(
-        run_agent_statement_analysis,
-        controller_config=controller_config,
+    """Run decomposition through presentation output inside one StateGraph."""
+
+    root = root.resolve()
+    statement = statement.strip()
+    language = language.strip()
+    if not statement:
+        raise EvidenceGapError("Statement cannot be blank")
+    if not language:
+        raise EvidenceGapError("language cannot be blank")
+    name = _safe_name(run_name)
+    base = artifact_root.resolve() if artifact_root else root / DEFAULT_ARTIFACT_ROOT
+    run_dir = base / name
+    require_empty_or_force(run_dir, force=force)
+    run_dir.mkdir(parents=True, exist_ok=False)
+    agent_dir = run_dir / "agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    trace = AgentTraceWriter(agent_dir)
+
+    defaults = {
+        "statement_decomposition": LLMStageConfig(
+            provider=provider,
+            model=model,
+            api_key_env=api_key_env,
+            base_url=base_url,
+            max_tokens=decomposition_max_tokens,
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
+            thinking=decomposition_thinking,
+        ),
+        "article_evidence": LLMStageConfig(
+            provider=provider,
+            model=model,
+            api_key_env=api_key_env,
+            base_url=base_url,
+            max_tokens=max_tokens,
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
+            thinking=analysis_thinking,
+            request_batch_size=request_batch_size,
+        ),
+        "inference_gap": LLMStageConfig(
+            provider=provider,
+            model=model,
+            api_key_env=api_key_env,
+            base_url=base_url,
+            max_tokens=gap_max_tokens,
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
+            thinking=gap_thinking,
+        ),
+        "localization": LLMStageConfig(
+            provider=provider,
+            model=model,
+            api_key_env=api_key_env,
+            base_url=base_url,
+            max_tokens=translation_max_tokens,
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
+            thinking=False,
+            request_batch_size=translation_request_batch_size,
+        ),
+        "agent_controller": controller_config,
+        "agent_gap_controller": gap_controller_config,
+    }
+    if stage_configs:
+        unknown = set(stage_configs) - set(defaults)
+        if unknown:
+            raise EvidenceGapError(f"Unknown LLM stage configuration: {sorted(unknown)}")
+        defaults.update(stage_configs)
+
+    context = AgentRuntimeContext(
+        root=root,
+        run_dir=run_dir,
+        run_name=name,
+        statement=statement,
+        language=language,
+        stage_configs=defaults,
+        pipeline_config=pipeline_config or PipelineConfig(),
         agent_config=agent_config,
+        trace_writer=trace,
+        runtime_resources=runtime_resources,
+        progress_callback=progress_callback,
+        resolved_config_snapshot=resolved_config_snapshot,
+        device=device,
+        amp=amp,
+        corpus_dir=corpus_dir,
+        article_input_dir=article_input_dir,
+        bm25_index_dir=bm25_index_dir,
+        medcpt_index_dir=medcpt_index_dir,
+        bmretriever_index_dir=bmretriever_index_dir,
+        cross_encoder_model_dir=cross_encoder_model_dir,
+        stanza_model_dir=stanza_model_dir,
+        stanza_package=stanza_package,
+        stanza_batch_size=stanza_batch_size,
+        cross_encoder_batch_size=cross_encoder_batch_size,
+        section_mode=section_mode,
+        allow_cpu_fallback=allow_cpu_fallback,
+        cache_dir=cache_dir,
     )
-    return run_statement_pipeline(root, statement_analysis_runner=runner, **kwargs)
+    article = defaults["article_evidence"]
+    analysis_kwargs = {
+        "provider": article.provider,
+        "model": article.model,
+        "device": device,
+        "amp": amp,
+        "corpus_dir": corpus_dir,
+        "article_input_dir": article_input_dir,
+        "bm25_index_dir": bm25_index_dir,
+        "medcpt_index_dir": medcpt_index_dir,
+        "bmretriever_index_dir": bmretriever_index_dir,
+        "cross_encoder_model_dir": cross_encoder_model_dir,
+        "stanza_model_dir": stanza_model_dir,
+        "stanza_package": stanza_package,
+        "stanza_batch_size": stanza_batch_size,
+        "cross_encoder_batch_size": cross_encoder_batch_size,
+        "section_mode": section_mode,
+        "allow_cpu_fallback": allow_cpu_fallback,
+        "api_key_env": article.api_key_env,
+        "base_url": article.base_url,
+        "request_batch_size": article.request_batch_size or 1,
+        "max_tokens": article.max_tokens,
+        "timeout_seconds": article.timeout_seconds,
+        "max_retries": article.max_retries,
+        "thinking": article.thinking,
+        "prompt_override": article.prompt,
+        "pipeline_config": context.pipeline_config,
+        "cache_dir": cache_dir,
+        "runtime_resources": runtime_resources,
+        "force": False,
+    }
+    tool = create_search_evidence_tool(
+        create_analysis_executor(
+            root=root,
+            analysis_kwargs=analysis_kwargs,
+            attempts_root=context.attempts_root,
+        )
+    )
+    connection: sqlite3.Connection | None = None
+    try:
+        checkpointer = None
+        if agent_config.checkpoint_enabled:
+            checkpoint_path = agent_dir / "checkpoints.sqlite"
+            connection = sqlite3.connect(checkpoint_path, check_same_thread=False)
+            checkpointer = SqliteSaver(connection)
+        graph = build_agent_graph(
+            controller=EvidenceController(controller_config),
+            gap_controller=GapController(gap_controller_config),
+            search_tool=tool,
+            stages=ProductionStageExecutor(context),
+            run_name=name,
+            max_steps=agent_config.max_steps,
+            total_search_budget=agent_config.total_search_budget,
+            per_claim_search_budget=agent_config.per_claim_search_budget,
+            max_gap_rounds=agent_config.max_gap_rounds,
+            gap_remediation_budget=agent_config.gap_remediation_budget,
+            controller_retry_count=agent_config.controller_retry_count,
+            gap_controller_retry_count=agent_config.gap_controller_retry_count,
+            trace_writer=trace,
+            progress_callback=progress_callback,
+            checkpointer=checkpointer,
+        )
+        (agent_dir / "execution_graph.mmd").write_text(
+            graph.get_graph().draw_mermaid(), encoding="utf-8"
+        )
+        state = graph.invoke(
+            {"node_history": []},
+            config={
+                "configurable": {"thread_id": name},
+                "recursion_limit": max(80, agent_config.max_steps * 8 + 40),
+            },
+        )
+    finally:
+        if connection is not None:
+            connection.close()
+    return dict(state["final_result"])
